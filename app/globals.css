@@ -1,26 +1,170 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@clerk/ui/themes/shadcn.css";
+@import "../styles/tokens.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
+/*
+ * Tailwind v4 theme — bridges the DUBR tokens (defined in styles/tokens.css)
+ * into Tailwind utilities. Component code should consume these via class
+ * names like `bg-background`, `text-tier-gold`, `shadow-elevation-1` — never
+ * raw hex. See DESIGN.md for the source of truth.
+ *
+ * Shadcn's semantic tokens (primary, accent, destructive, …) are intentionally
+ * collapsed onto the DUBR palette so any shadcn primitive renders in our
+ * visual language without per-component overrides.
+ */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Font stack — Inter only, per DESIGN.md. Loaded via next/font in layout.tsx. */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-heading: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /* Core surfaces */
+  --color-background: var(--dubr-background);
+  --color-foreground: var(--dubr-text-primary);
+  --color-surface: var(--dubr-surface);
+  --color-surface-elevated: var(--dubr-surface-elevated);
+  --color-surface-muted: var(--dubr-surface-muted);
+  --color-scrim: var(--dubr-scrim);
+
+  /* Text */
+  --color-text-primary: var(--dubr-text-primary);
+  --color-text-secondary: var(--dubr-text-secondary);
+  --color-text-muted: var(--dubr-text-muted);
+  --color-text-on-accent: var(--dubr-text-on-accent);
+
+  /* Status — locked semantics from DESIGN.md */
+  --color-accent: var(--dubr-accent);
+  --color-accent-foreground: var(--dubr-on-accent);
+  --color-accent-soft: var(--dubr-accent-soft);
+  --color-danger: var(--dubr-danger);
+  --color-danger-soft: var(--dubr-danger-soft);
+  --color-warning: var(--dubr-warning);
+  --color-warning-soft: var(--dubr-warning-soft);
+  --color-info: var(--dubr-info);
+
+  /* Tier palette — exposed as `text-tier-gold`, `bg-tier-platinum`, etc. */
+  --color-tier-bronze: var(--dubr-tier-bronze);
+  --color-tier-silver: var(--dubr-tier-silver);
+  --color-tier-gold: var(--dubr-tier-gold);
+  --color-tier-platinum: var(--dubr-tier-platinum);
+  --color-tier-diamond: var(--dubr-tier-diamond);
+  --color-tier-master: var(--dubr-tier-master);
+
+  /* Shadcn shims — keep shadcn primitives visually aligned. */
+  --color-card: var(--dubr-surface);
+  --color-card-foreground: var(--dubr-text-primary);
+  --color-popover: var(--dubr-surface);
+  --color-popover-foreground: var(--dubr-text-primary);
+  --color-primary: var(--dubr-primary);
+  --color-primary-foreground: var(--dubr-on-primary);
+  --color-secondary: var(--dubr-surface-muted);
+  --color-secondary-foreground: var(--dubr-text-primary);
+  --color-muted: var(--dubr-surface-muted);
+  --color-muted-foreground: var(--dubr-text-secondary);
+  --color-destructive: var(--dubr-danger);
+  --color-border: var(--dubr-border);
+  --color-input: var(--dubr-border);
+  --color-ring: var(--dubr-focus-ring);
+
+  /* Radius — DESIGN.md scale */
+  --radius-xs: var(--dubr-radius-xs);
+  --radius-sm: var(--dubr-radius-sm);
+  --radius-md: var(--dubr-radius-md);
+  --radius-lg: var(--dubr-radius-lg);
+  --radius-xl: var(--dubr-radius-xl);
+  --radius-full: var(--dubr-radius-full);
+  /* Shadcn primitives read `--radius`; pin to lg so cards land at 14px */
+  --radius: var(--dubr-radius-lg);
+
+  /* Elevation */
+  --shadow-elevation-1: var(--dubr-elevation-1);
+  --shadow-elevation-2: var(--dubr-elevation-2);
+  --shadow-elevation-3: var(--dubr-elevation-3);
+
+  /* Typography scale — DESIGN.md numeric + display + body tokens.
+     Consumed via `text-display-lg`, `text-numeral-md`, etc. */
+  --text-display-xl: 4.5rem;
+  --text-display-xl--line-height: 1;
+  --text-display-xl--letter-spacing: -0.03em;
+  --text-display-xl--font-weight: 700;
+
+  --text-display-lg: 3rem;
+  --text-display-lg--line-height: 1;
+  --text-display-lg--letter-spacing: -0.02em;
+  --text-display-lg--font-weight: 700;
+
+  --text-numeral-lg: 2rem;
+  --text-numeral-lg--line-height: 1;
+  --text-numeral-lg--font-weight: 700;
+
+  --text-numeral-md: 1.25rem;
+  --text-numeral-md--line-height: 1;
+  --text-numeral-md--font-weight: 600;
+
+  --text-numeral-sm: 0.9375rem;
+  --text-numeral-sm--line-height: 1;
+  --text-numeral-sm--font-weight: 500;
+
+  --text-label: 0.75rem;
+  --text-label--line-height: 1;
+  --text-label--letter-spacing: 0.04em;
+  --text-label--font-weight: 600;
+
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  html {
+    @apply font-sans;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /*
+   * iOS Safari zooms <input> into focus when computed font-size < 16px.
+   * DESIGN.md hard-rules every input ≥16px; default here so a missed
+   * className doesn't ship the regression.
+   */
+  input,
+  textarea,
+  select {
+    font-size: max(1rem, 16px);
+  }
+
+  /*
+   * Tabular numerals on every numeric primitive — DESIGN.md mandate.
+   * Anything wrapped in a <data> tag or marked `tnum` opts in; we also
+   * default the `numeral-*` text utilities to tabular.
+   */
+  .text-display-xl,
+  .text-display-lg,
+  .text-numeral-lg,
+  .text-numeral-md,
+  .text-numeral-sm {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv11" 1;
+  }
+
+  /* Respect prefers-reduced-motion — DESIGN.md "Don't" list. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
