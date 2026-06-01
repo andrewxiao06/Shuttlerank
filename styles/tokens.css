@@ -8,22 +8,23 @@
  */
 
 :root {
-  /* Surfaces */
-  --dubr-background: #FAFAF7;
+  /* Surfaces — white app canvas with a barely-there green tint */
+  --dubr-background: #F6FAF6;
   --dubr-surface: #FFFFFF;
   --dubr-surface-elevated: #FFFFFF;
-  --dubr-surface-muted: #F2F1EC;
+  --dubr-surface-muted: #ECF3EC;
   --dubr-scrim: rgba(10, 10, 10, 0.08);
 
   /* Text */
   --dubr-text-primary: #0A0A0A;
-  --dubr-text-secondary: #525252;
+  --dubr-text-secondary: #4B5563;
   --dubr-text-muted: #8A8A8A;
   --dubr-text-on-accent: #FFFFFF;
 
-  /* Brand + status */
-  --dubr-primary: #0A0A0A;
-  --dubr-on-primary: #FAFAF7;
+  /* Brand + status — court green (#15803D, Tailwind green-700) as primary */
+  --dubr-primary: #15803D;
+  --dubr-primary-hover: #166534;
+  --dubr-on-primary: #FFFFFF;
   --dubr-accent: #16A34A;
   --dubr-on-accent: #FFFFFF;
   --dubr-danger: #DC2626;
@@ -35,10 +36,10 @@
   --dubr-danger-soft: #FEE2E2;
   --dubr-warning-soft: #FEF3C7;
 
-  /* Borders */
-  --dubr-border: #E5E5E0;
+  /* Borders — soft green-tinted boundaries */
+  --dubr-border: #DCE5DC;
   --dubr-border-strong: #0A0A0A;
-  --dubr-focus-ring: #16A34A;
+  --dubr-focus-ring: #15803D;
 
   /* Tier palette — hard-mapped. Never reinterpret. */
   --dubr-tier-bronze: #A97142;
@@ -63,17 +64,18 @@
 }
 
 .dark {
-  --dubr-background: #0F0F0F;
-  --dubr-surface: #1A1A1A;
-  --dubr-surface-elevated: #1A1A1A;
-  --dubr-surface-muted: #242422;
+  --dubr-background: #0B0F0B;
+  --dubr-surface: #141914;
+  --dubr-surface-elevated: #141914;
+  --dubr-surface-muted: #1E241E;
   --dubr-text-primary: #F5F5F5;
   --dubr-text-secondary: #B5B5B5;
   --dubr-text-muted: #8A8A8A;
-  --dubr-border: #2A2A2A;
+  --dubr-border: #25302A;
   --dubr-border-strong: #F5F5F5;
-  --dubr-primary: #F5F5F5;
-  --dubr-on-primary: #0F0F0F;
+  --dubr-primary: #22C55E;
+  --dubr-primary-hover: #15803D;
+  --dubr-on-primary: #0B0F0B;
   /* status + tier tokens unchanged — both modes pass contrast */
 }
 

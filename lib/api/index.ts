@@ -23,6 +23,7 @@ const impl = useMocks ? mock : client;
 
 export const getMe = impl.getMe;
 export const patchMe = impl.patchMe;
+export const bootstrapMe = impl.bootstrapMe;
 export const getPlayer = impl.getPlayer;
 export const listPlayerMatches = impl.listPlayerMatches;
 export const getMatch = impl.getMatch;

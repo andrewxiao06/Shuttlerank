@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
-import { shadcn } from "@clerk/ui/themes";
 import { Providers } from "./providers";
 import { TopNav } from "@/components/layout/Nav";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
@@ -37,7 +36,18 @@ export default function RootLayout({
       className={`${inter.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        <ClerkProvider appearance={{ theme: shadcn }}>
+        <ClerkProvider
+          appearance={{
+            variables: {
+              colorPrimary: "#15803D",
+              colorBackground: "#FFFFFF",
+              borderRadius: "10px",
+            },
+            elements: {
+              card: "shadow-2xl border border-[#DCE5DC]",
+            },
+          }}
+        >
           <Providers>
             <TopNav />
             <div className="flex-1 pb-20 md:pb-0">{children}</div>

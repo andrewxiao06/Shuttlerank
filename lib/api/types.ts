@@ -144,6 +144,15 @@ export const PlayerMePatchSchema = z.object({
 });
 export type PlayerMePatch = z.infer<typeof PlayerMePatchSchema>;
 
+/** Body the client posts to /v1/players/bootstrap on first sign-in. */
+export const PlayerBootstrapSchema = z.object({
+  name: z.string().min(1).max(120),
+  display_name: z.string().max(120).nullable().optional(),
+  email: z.string().max(320).nullable().optional(),
+  gender: PlayerGenderSchema.nullable().optional(),
+});
+export type PlayerBootstrap = z.infer<typeof PlayerBootstrapSchema>;
+
 // ---------------------------------------------------------------------------
 // Matches (v1)
 // ---------------------------------------------------------------------------
