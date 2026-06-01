@@ -14,7 +14,7 @@
  * replaced with a real JWT verify.
  */
 
-import { getAuthToken, getUserId } from "./auth-bridge";
+import { getAuthToken, getUserId, waitForAuthReady } from "./auth-bridge";
 import {
   CategoryMatchSchema,
   ForecastSchema,
@@ -71,6 +71,11 @@ async function request<S extends z.ZodTypeAny>(
     Accept: "application/json",
   };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+
+  // Wait briefly for Clerk's auth hook to hydrate before firing the
+  // request — eliminates the fresh-tab race where the first few
+  // requests would hit the backend without an auth header.
+  await waitForAuthReady();
 
   const token = await getAuthToken();
   if (token) headers["Authorization"] = `Bearer ${token}`;

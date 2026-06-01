@@ -1,15 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  SignInButton,
-  SignUpButton,
-  useAuth,
-  useUser,
-} from "@clerk/nextjs";
-import { bootstrapMe, getMe, listPlayerMatches } from "@/lib/api";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
+import { getMe, listPlayerMatches } from "@/lib/api";
 import {
   CATEGORY_LABEL,
   type CategoryRating,
@@ -28,12 +23,9 @@ import { isCalibrating } from "@/lib/tier";
  */
 export function HomeView() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { user } = useUser();
-  const qc = useQueryClient();
 
-  // Don't fire /players/me until Clerk has loaded and a session exists —
-  // otherwise the backend returns 401 and we'd flash a misleading
-  // "Couldn't load profile" error to signed-out visitors.
+  // Bootstrap-on-first-load happens in `app/providers.tsx` so every screen
+  // — not just home — sees a healthy Player row after sign-in.
   const meQ = useQuery({
     queryKey: ["me"],
     queryFn: getMe,
@@ -41,36 +33,6 @@ export function HomeView() {
     retry: false,
   });
   const playerId = meQ.data?.id;
-
-  // Auto-bootstrap on first sign-in. The backend webhook is the primary
-  // path for creating Player rows on user.created, but in local dev
-  // (where Clerk can't reach localhost) and as a production safety net
-  // for missed webhooks, we POST /v1/players/bootstrap with the Clerk
-  // profile data when /players/me returns 403 ("no Player row").
-  const bootstrap = useMutation({
-    mutationFn: () =>
-      bootstrapMe({
-        name:
-          [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
-          user?.username ||
-          user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
-          "Player",
-        display_name: user?.firstName ?? null,
-        email: user?.primaryEmailAddress?.emailAddress ?? null,
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
-  });
-
-  useEffect(() => {
-    if (
-      meQ.isError &&
-      user != null &&
-      !bootstrap.isPending &&
-      /no Player row|403/i.test((meQ.error as Error).message)
-    ) {
-      bootstrap.mutate();
-    }
-  }, [meQ.isError, meQ.error, user, bootstrap]);
 
   const matchesQ = useQuery({
     queryKey: ["matches", playerId],
@@ -89,7 +51,7 @@ export function HomeView() {
 
   if (!isLoaded) return <Skeleton />;
   if (!isSignedIn) return <SignedOutHero />;
-  if (meQ.isPending || bootstrap.isPending) return <Skeleton />;
+  if (meQ.isPending) return <Skeleton />;
   if (meQ.isError)
     return (
       <ErrorState

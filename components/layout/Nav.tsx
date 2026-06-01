@@ -86,7 +86,15 @@ export function TopNav() {
             </SignUpButton>
           </Show>
           <Show when="signed-in">
-            <UserButton />
+            <UserButton>
+              <UserButton.MenuItems>
+                <UserButton.Link
+                  label="Settings"
+                  labelIcon={<span aria-hidden>⚙</span>}
+                  href="/me"
+                />
+              </UserButton.MenuItems>
+            </UserButton>
           </Show>
         </div>
       </nav>

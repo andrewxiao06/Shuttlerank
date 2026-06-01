@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
 import { TopNav } from "@/components/layout/Nav";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
+import { ProfileSetupBanner } from "@/components/onboarding/ProfileSetupBanner";
 import "./globals.css";
 
 // Inter is the only product family — DESIGN.md typography section.
@@ -50,6 +51,7 @@ export default function RootLayout({
         >
           <Providers>
             <TopNav />
+            <ProfileSetupBanner />
             <div className="flex-1 pb-20 md:pb-0">{children}</div>
             <MobileTabBar />
           </Providers>
