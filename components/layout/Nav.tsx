@@ -69,14 +69,17 @@ export function TopNav() {
           </Link>
           <Show when="signed-out">
             <SignInButton mode="modal">
-              <button type="button" className="text-body-md text-text-secondary hover:text-text-primary">
+              <button
+                type="button"
+                className="inline-flex h-10 items-center rounded-md px-4 text-body-md text-text-primary hover:bg-surface-muted"
+              >
                 Sign in
               </button>
             </SignInButton>
             <SignUpButton mode="modal">
               <button
                 type="button"
-                className="inline-flex h-10 items-center rounded-md border border-border bg-surface px-4 text-body-md hover:bg-surface-muted"
+                className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-body-md text-on-primary hover:opacity-90"
               >
                 Sign up
               </button>

@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { getMe, listPlayerMatches } from "@/lib/api";
+import { useEffect, useMemo } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  SignInButton,
+  SignUpButton,
+  useAuth,
+  useUser,
+} from "@clerk/nextjs";
+import { bootstrapMe, getMe, listPlayerMatches } from "@/lib/api";
 import {
   CATEGORY_LABEL,
   type CategoryRating,
@@ -21,8 +27,50 @@ import { isCalibrating } from "@/lib/tier";
  * (same selection rule as Profile screen so the two stay in sync).
  */
 export function HomeView() {
-  const meQ = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
+  const qc = useQueryClient();
+
+  // Don't fire /players/me until Clerk has loaded and a session exists —
+  // otherwise the backend returns 401 and we'd flash a misleading
+  // "Couldn't load profile" error to signed-out visitors.
+  const meQ = useQuery({
+    queryKey: ["me"],
+    queryFn: getMe,
+    enabled: isLoaded && !!isSignedIn,
+    retry: false,
+  });
   const playerId = meQ.data?.id;
+
+  // Auto-bootstrap on first sign-in. The backend webhook is the primary
+  // path for creating Player rows on user.created, but in local dev
+  // (where Clerk can't reach localhost) and as a production safety net
+  // for missed webhooks, we POST /v1/players/bootstrap with the Clerk
+  // profile data when /players/me returns 403 ("no Player row").
+  const bootstrap = useMutation({
+    mutationFn: () =>
+      bootstrapMe({
+        name:
+          [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+          user?.username ||
+          user?.primaryEmailAddress?.emailAddress?.split("@")[0] ||
+          "Player",
+        display_name: user?.firstName ?? null,
+        email: user?.primaryEmailAddress?.emailAddress ?? null,
+      }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["me"] }),
+  });
+
+  useEffect(() => {
+    if (
+      meQ.isError &&
+      user != null &&
+      !bootstrap.isPending &&
+      /no Player row|403/i.test((meQ.error as Error).message)
+    ) {
+      bootstrap.mutate();
+    }
+  }, [meQ.isError, meQ.error, user, bootstrap]);
 
   const matchesQ = useQuery({
     queryKey: ["matches", playerId],
@@ -30,13 +78,18 @@ export function HomeView() {
     enabled: playerId != null,
   });
 
+  // useMemo must run on every render — keep it above any conditional
+  // returns to satisfy React's rules-of-hooks. Sign-out flips
+  // `meQ.data` to undefined so the memo cheaply returns null.
   const hero: CategoryRating | null = useMemo(() => {
     const played = (meQ.data?.ratings ?? []).filter((r) => r.match_count > 0);
     if (played.length === 0) return meQ.data?.ratings[0] ?? null;
     return played.reduce((a, b) => (b.display > a.display ? b : a));
   }, [meQ.data]);
 
-  if (meQ.isPending) return <Skeleton />;
+  if (!isLoaded) return <Skeleton />;
+  if (!isSignedIn) return <SignedOutHero />;
+  if (meQ.isPending || bootstrap.isPending) return <Skeleton />;
   if (meQ.isError)
     return (
       <ErrorState
@@ -121,6 +174,60 @@ export function HomeView() {
           </ul>
         )}
       </section>
+    </main>
+  );
+}
+
+function SignedOutHero() {
+  return (
+    <main className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center px-4 py-16 text-center sm:px-6">
+      <p className="text-label uppercase text-primary">DUBR</p>
+      <h1 className="mt-3 text-display-lg">Badminton, rated.</h1>
+      <p className="mt-4 max-w-md text-body-md text-text-secondary">
+        Track your club ranking across six categories. Casual matches verify
+        instantly; ranked matches need both teams to approve.
+      </p>
+      <div className="mt-8 flex gap-3">
+        <SignUpButton mode="modal">
+          <button
+            type="button"
+            className="inline-flex h-12 items-center rounded-md bg-primary px-6 text-body-md text-on-primary hover:opacity-90"
+          >
+            Create an account
+          </button>
+        </SignUpButton>
+        <SignInButton mode="modal">
+          <button
+            type="button"
+            className="inline-flex h-12 items-center rounded-md border border-border bg-surface px-6 text-body-md text-text-primary hover:bg-surface-muted"
+          >
+            Sign in
+          </button>
+        </SignInButton>
+      </div>
+      <div className="mt-12 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
+        <Link
+          href="/leaderboard"
+          className="rounded-lg border border-border bg-surface p-4 text-left hover:bg-surface-muted"
+        >
+          <p className="text-h3">Leaderboard</p>
+          <p className="text-caption text-text-muted">Browse the club</p>
+        </Link>
+        <Link
+          href="/tournaments"
+          className="rounded-lg border border-border bg-surface p-4 text-left hover:bg-surface-muted"
+        >
+          <p className="text-h3">Tournaments</p>
+          <p className="text-caption text-text-muted">Upcoming + past events</p>
+        </Link>
+        <Link
+          href="/forecast"
+          className="rounded-lg border border-border bg-surface p-4 text-left hover:bg-surface-muted"
+        >
+          <p className="text-h3">Forecast</p>
+          <p className="text-caption text-text-muted">Who wins?</p>
+        </Link>
+      </div>
     </main>
   );
 }

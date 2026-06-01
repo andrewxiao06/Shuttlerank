@@ -79,6 +79,11 @@ export async function getMe(): Promise<PlayerMe> {
   return delay(store.me);
 }
 
+export async function bootstrapMe(_body: unknown): Promise<PlayerMe> {
+  // Mock has a pre-seeded ME — bootstrapping is a no-op.
+  return delay(store.me);
+}
+
 export async function patchMe(patch: PlayerMePatch): Promise<PlayerMe> {
   if (patch.display_name !== undefined)
     store.me = { ...store.me, display_name: patch.display_name ?? null };

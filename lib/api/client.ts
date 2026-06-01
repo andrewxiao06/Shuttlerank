@@ -28,6 +28,7 @@ import {
   type CategoryMatchCreate,
   type Forecast,
   type Leaderboard,
+  type PlayerBootstrap,
   type PlayerGender,
   type PlayerMe,
   type PlayerMePatch,
@@ -121,6 +122,13 @@ export async function patchMe(patch: PlayerMePatch): Promise<PlayerMe> {
   return request("/players/me", PlayerMeSchema, {
     method: "PATCH",
     body: patch,
+  });
+}
+
+export async function bootstrapMe(body: PlayerBootstrap): Promise<PlayerMe> {
+  return request("/v1/players/bootstrap", PlayerMeSchema, {
+    method: "POST",
+    body,
   });
 }
 
