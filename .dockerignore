@@ -1,0 +1,38 @@
+# Local dev artifacts that should never end up in the image.
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# Git
+.git/
+.gitignore
+
+# Docker itself
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Environment files — never bake secrets into images.
+.env
+.env.*
+!.env.example
+
+# Logs and local databases
+*.log
+*.db
+*.sqlite*
+
+# Frontend artifacts (when we add them)
+node_modules/
+.next/

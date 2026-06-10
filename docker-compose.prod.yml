@@ -1,0 +1,77 @@
+# Production stack for EC2: Postgres + Redis + FastAPI + Caddy (TLS).
+#
+# This is a STANDALONE compose file (not an overlay on docker-compose.yml) so
+# none of the dev conveniences — source bind-mount, --reload, the
+# CLERK_DEV_ALLOW_HEADER bypass — can ever leak into production.
+#
+# Run:  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# Logs: docker compose -f docker-compose.prod.yml logs -f api
+#
+# The frontend is NOT here — it deploys to Vercel. Caddy fronts only the API.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in .env.prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:?set in .env.prod}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    # No published port — only the api container reaches Postgres over the
+    # compose network. Keeps the DB off the public internet.
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    # No published port — internal only.
+
+  api:
+    build:
+      context: .
+    restart: unless-stopped
+    env_file:
+      - .env.prod
+    environment:
+      # Internal service URLs override whatever placeholders are in .env.prod.
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      REDIS_URL: redis://redis:6379/0
+      # NOTE: no UVICORN_EXTRA_ARGS (no --reload) and no CLERK_DEV_ALLOW_HEADER.
+    expose:
+      - "8000"          # reachable by Caddy on the internal network only
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # persisted TLS certs — DO NOT delete casually
+      - caddy_config:/config
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set in .env.prod, e.g. api.yourdomain.com}
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
