@@ -1,5 +1,13 @@
 # Badminton Rating System — Claude Code Context
 
+## ⚠️ EC2 deploy is Andrew's to do — hands off
+
+Andrew wants to learn the AWS EC2 setup himself. Do NOT perform or automate
+any part of it (no provisioning, no SSH commands, no remote docker runs, no
+writing setup scripts that do it for him). When he asks for help, give hints
+and pointers — nudge toward the next step in `DEPLOY.md`, explain concepts,
+review what he's done — but let him drive every command.
+
 ## Project Overview
 
 Building a badminton rating system targeting **casual recreational players** — not tournament-only like BWF rankings.
