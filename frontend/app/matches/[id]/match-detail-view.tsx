@@ -14,10 +14,7 @@ import {
   getPlayer,
   validateMatch,
 } from "@/lib/api";
-import {
-  CATEGORY_LABEL,
-  type MatchParticipant,
-} from "@/lib/api/types";
+import { type MatchParticipant } from "@/lib/api/types";
 import { StatusBanner } from "@/components/match/StatusBanner";
 import { ReportModal } from "@/components/match/ReportModal";
 import { DeltaPill } from "@/components/match/DeltaPill";
@@ -95,7 +92,8 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
       <header className="mt-3 flex items-baseline justify-between gap-3">
         <div>
           <p className="text-label uppercase text-text-secondary">
-            {match.category ? CATEGORY_LABEL[match.category] : "Match"}
+            {match.participants.length > 2 ? "Doubles" : "Singles"}
+            {match.tournament_id != null ? " · Tournament" : ""}
           </p>
           <h1 className="text-h1">Match #{match.id}</h1>
         </div>

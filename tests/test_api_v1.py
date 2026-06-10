@@ -146,14 +146,19 @@ async def test_get_me_unknown_clerk_id_is_403(client):
 
 
 @pytest.mark.asyncio
-async def test_get_me_returns_profile_with_empty_ratings(factory_app, client):
+async def test_get_me_returns_profile_with_default_rating(factory_app, client):
     _, factory = factory_app
     await _seed_player(factory, name="Alice", clerk_id="clerk_alice")
     r = await client.get("/players/me", headers=_h("clerk_alice"))
     assert r.status_code == 200
     body = r.json()
     assert body["clerk_user_id"] == "clerk_alice"
-    assert body["ratings"] == []
+    # Players who haven't played yet still get the single default rating.
+    assert len(body["ratings"]) == 1
+    rating = body["ratings"][0]
+    assert rating["category"] == "overall"
+    assert rating["match_count"] == 0
+    assert rating["calibrating"] is True
 
 
 @pytest.mark.asyncio
@@ -176,7 +181,7 @@ async def test_patch_me_updates_display_name_and_gender(factory_app, client):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_post_v1_match_casual_verifies_immediately(factory_app, client):
+async def test_post_v1_match_starts_pending_with_overall_category(factory_app, client):
     _, factory = factory_app
     a = await _seed_player(factory, name="A", clerk_id="clerk_a", gender=PlayerGender.M)
     b = await _seed_player(factory, name="B", clerk_id="clerk_b", gender=PlayerGender.M)
@@ -184,7 +189,6 @@ async def test_post_v1_match_casual_verifies_immediately(factory_app, client):
         "/v1/matches",
         headers=_h("clerk_a"),
         json={
-            "category": "casual",
             "played_at": str(date(2026, 4, 20)),
             "team_a_player_ids": [a],
             "team_b_player_ids": [b],
@@ -194,8 +198,9 @@ async def test_post_v1_match_casual_verifies_immediately(factory_app, client):
     )
     assert r.status_code == 201, r.text
     body = r.json()
-    assert body["status"] == "verified"
-    assert body["verified_at"] is not None
+    assert body["status"] == "pending"
+    assert body["category"] == "overall"
+    assert body["verified_at"] is None
 
 
 @pytest.mark.asyncio
@@ -220,7 +225,8 @@ async def test_post_v1_match_ranked_starts_pending(factory_app, client):
 
 
 @pytest.mark.asyncio
-async def test_post_v1_match_rejects_gender_violation(factory_app, client):
+async def test_post_v1_match_allows_any_gender_matchup(factory_app, client):
+    """Anyone can play anyone — gender is profile metadata only."""
     _, factory = factory_app
     m = await _seed_player(factory, name="M", clerk_id="clerk_m", gender=PlayerGender.M)
     w = await _seed_player(factory, name="W", clerk_id="clerk_w", gender=PlayerGender.W)
@@ -228,14 +234,14 @@ async def test_post_v1_match_rejects_gender_violation(factory_app, client):
         "/v1/matches",
         headers=_h("clerk_m"),
         json={
-            "category": "mens_singles",
             "played_at": str(date(2026, 4, 20)),
             "team_a_player_ids": [m],
             "team_b_player_ids": [w],
             "team_a_score": 21, "team_b_score": 15,
         },
     )
-    assert r.status_code == 400
+    assert r.status_code == 201, r.text
+    assert r.json()["status"] == "pending"
 
 
 # ---------------------------------------------------------------------------
@@ -243,17 +249,16 @@ async def test_post_v1_match_rejects_gender_violation(factory_app, client):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_both_approvals_flip_match_to_verified(factory_app, client):
+async def test_opponent_approval_flips_match_to_verified(factory_app, client):
     _, factory = factory_app
     a = await _seed_player(factory, name="A", clerk_id="clerk_a", gender=PlayerGender.M)
     b = await _seed_player(factory, name="B", clerk_id="clerk_b", gender=PlayerGender.M)
 
-    # Submit ranked → PENDING
+    # Submit → PENDING; the submitter (A) auto-approves.
     r = await client.post(
         "/v1/matches",
         headers=_h("clerk_a"),
         json={
-            "category": "mens_singles",
             "played_at": str(date(2026, 4, 20)),
             "team_a_player_ids": [a],
             "team_b_player_ids": [b],
@@ -262,21 +267,21 @@ async def test_both_approvals_flip_match_to_verified(factory_app, client):
     )
     match_id = r.json()["id"]
 
-    # A approves
+    # A approving again is a conflict — their submission already counted.
     r1 = await client.post(
         f"/v1/matches/{match_id}/validate",
         headers=_h("clerk_a"),
         json={"action": "approved"},
     )
-    assert r1.status_code == 201
+    assert r1.status_code == 409
 
-    # B approves → match verifies
+    # B approves → all participants approved → match verifies
     r2 = await client.post(
         f"/v1/matches/{match_id}/validate",
         headers=_h("clerk_b"),
         json={"action": "approved"},
     )
-    assert r2.status_code == 201
+    assert r2.status_code == 201, r2.text
 
     # Fetch state
     detail = await client.get(f"/v1/matches/{match_id}")
@@ -497,6 +502,67 @@ async def test_non_organizer_cannot_generate_pairings(factory_app, client):
         headers=_h("clerk_p1"),
     )
     assert r.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_ranked_tournament_requires_admin(factory_app, client):
+    _, factory = factory_app
+    await _seed_player(factory, name="Rando", clerk_id="clerk_rando")
+    await _seed_player(factory, name="Admin", clerk_id="clerk_admin")
+    body = {
+        "name": "Official Open",
+        "format": "single_elim",
+        "ranked": True,
+        "starts_at": "2026-05-01T10:00:00Z",
+    }
+    denied = await client.post("/tournaments", headers=_h("clerk_rando"), json=body)
+    assert denied.status_code == 403
+
+    allowed = await client.post("/tournaments", headers=_h("clerk_admin"), json=body)
+    assert allowed.status_code == 201, allowed.text
+    assert allowed.json()["ranked"] is True
+
+
+@pytest.mark.asyncio
+async def test_anyone_can_create_casual_tournament(factory_app, client):
+    _, factory = factory_app
+    await _seed_player(factory, name="Rando", clerk_id="clerk_rando")
+    r = await client.post(
+        "/tournaments",
+        headers=_h("clerk_rando"),
+        json={
+            "name": "Friday Night Smash",
+            "format": "round_robin",
+            "starts_at": "2026-05-01T10:00:00Z",
+        },
+    )
+    assert r.status_code == 201, r.text
+    assert r.json()["ranked"] is False
+
+
+# ---------------------------------------------------------------------------
+# Forecast — works for any two players, rated or not
+# ---------------------------------------------------------------------------
+
+@pytest.mark.asyncio
+async def test_forecast_works_for_unrated_players(factory_app, client):
+    _, factory = factory_app
+    a = await _seed_player(factory, name="A", clerk_id="clerk_a")
+    b = await _seed_player(factory, name="B", clerk_id="clerk_b")
+    r = await client.get(f"/v1/players/{a}/forecast?opponent_id={b}")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # Two fresh players are an even matchup.
+    assert body["win_probability"] == pytest.approx(0.5, abs=0.01)
+    assert body["player_calibrating"] is True
+
+
+@pytest.mark.asyncio
+async def test_forecast_404_for_unknown_player(factory_app, client):
+    _, factory = factory_app
+    a = await _seed_player(factory, name="A", clerk_id="clerk_a")
+    r = await client.get(f"/v1/players/{a}/forecast?opponent_id=99999")
+    assert r.status_code == 404
 
 
 # ---------------------------------------------------------------------------

@@ -34,6 +34,7 @@ export const reportMatch = impl.reportMatch;
 export const getLeaderboard = impl.getLeaderboard;
 export const getForecast = impl.getForecast;
 export const listTournaments = impl.listTournaments;
+export const createTournament = impl.createTournament;
 export const getTournament = impl.getTournament;
 export const enterTournament = impl.enterTournament;
 export const withdrawFromTournament = impl.withdrawFromTournament;

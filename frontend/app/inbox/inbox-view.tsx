@@ -15,7 +15,6 @@ import {
   validateMatch,
 } from "@/lib/api";
 import {
-  CATEGORY_SHORT,
   type CategoryMatch,
   type ValidationAction,
 } from "@/lib/api/types";
@@ -129,7 +128,7 @@ function PendingCard({
     <article className="space-y-3 rounded-lg border border-border bg-surface p-4 shadow-elevation-1">
       <div className="flex items-baseline justify-between gap-3">
         <p className="text-label uppercase text-text-secondary">
-          {match.category ? CATEGORY_SHORT[match.category] : "Match"} ·{" "}
+          {match.participants.length > 2 ? "Doubles" : "Singles"} ·{" "}
           {match.played_at}
         </p>
         <span className="text-caption text-warning">

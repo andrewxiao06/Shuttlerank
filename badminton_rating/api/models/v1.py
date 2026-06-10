@@ -50,7 +50,11 @@ class PlayerMeOut(BaseModel):
     email: Optional[str]
     gender: Optional[PlayerGender]
     created_at: datetime
+    # Single-element list holding the player's one OVERALL rating. Kept as a
+    # list so the response shape survives any future multi-rating revival.
     ratings: List[CategoryRatingOut]
+    # True when the player may host ranked tournaments (BRS_ADMIN_USER_IDS).
+    is_admin: bool = False
 
 
 class PlayerMePatch(BaseModel):
@@ -83,7 +87,6 @@ class ClerkWebhookEvent(BaseModel):
 # ---------------------------------------------------------------------------
 
 class CategoryMatchCreate(BaseModel):
-    category: RatingCategory
     played_at: date
     team_a_player_ids: List[int] = Field(..., min_length=1, max_length=2)
     team_b_player_ids: List[int] = Field(..., min_length=1, max_length=2)
@@ -173,7 +176,7 @@ class CategoryLeaderboardEntry(BaseModel):
 
 
 class CategoryLeaderboardOut(BaseModel):
-    category: RatingCategory
+    category: RatingCategory = RatingCategory.OVERALL
     total: int
     limit: int
     offset: int
@@ -187,7 +190,8 @@ class CategoryLeaderboardOut(BaseModel):
 class TournamentCreate(BaseModel):
     name: str = Field(..., max_length=200)
     format: TournamentFormat
-    category: RatingCategory
+    # Ranked tournaments require admin privileges to create.
+    ranked: bool = False
     starts_at: datetime
     ends_at: Optional[datetime] = None
 
@@ -205,7 +209,7 @@ class TournamentOut(BaseModel):
     id: int
     name: str
     format: TournamentFormat
-    category: RatingCategory
+    ranked: bool
     starts_at: datetime
     ends_at: Optional[datetime]
     status: TournamentStatus
@@ -224,7 +228,6 @@ class PairingsOut(BaseModel):
 class CategoryForecastOut(BaseModel):
     player_id: int
     opponent_id: int
-    category: RatingCategory
     player_display: float
     opponent_display: float
     win_probability: float

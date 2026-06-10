@@ -24,6 +24,7 @@ from badminton_rating.api.models.v1 import (
     MatchParticipantOut,
     PlayerMeOut,
 )
+from badminton_rating.api.routes.admin import is_admin_user
 from badminton_rating.api.routes.me import _category_ratings
 from badminton_rating.db.models import (
     Match,
@@ -108,6 +109,7 @@ async def bootstrap_current_player(
         gender=existing.gender,
         created_at=existing.created_at,
         ratings=await _category_ratings(session, existing.id),
+        is_admin=is_admin_user(existing.clerk_user_id),
     )
 
 
@@ -115,13 +117,11 @@ async def bootstrap_current_player(
 async def search_players(
     session: AsyncSession = Depends(get_db),
     q: Optional[str] = Query(None, max_length=120),
-    gender: Optional[List[PlayerGender]] = Query(None),
     limit: int = Query(10, ge=1, le=50),
 ) -> List[PlayerMeOut]:
     """
-    Search players by partial name (case-insensitive). When `gender` is
-    supplied, only return players in those gender buckets — used by the
-    submit-match flow to filter by category eligibility.
+    Search players by partial name (case-insensitive). Anyone can play
+    anyone — no gender filtering.
     """
     stmt = select(Player)
     if q:
@@ -132,8 +132,6 @@ async def search_players(
                 Player.display_name.ilike(like),
             )
         )
-    if gender:
-        stmt = stmt.where(Player.gender.in_(gender))
     stmt = stmt.order_by(Player.name).limit(limit)
 
     players = (await session.execute(stmt)).scalars().all()

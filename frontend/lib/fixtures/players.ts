@@ -38,14 +38,8 @@ export const ME: PlayerMe = {
   email: "andrewxiaotoo@gmail.com",
   gender: "M",
   created_at: "2026-02-01T12:00:00Z",
-  ratings: [
-    rating("mens_singles", 4.213, { matches: 68 }),
-    rating("mens_doubles", 4.512, { matches: 51 }),
-    rating("mixed_doubles", 3.910, { matches: 28 }),
-    rating("casual", 4.301, { matches: 120 }),
-    rating("womens_singles", 0, { matches: 0, rd: 350 }),
-    rating("womens_doubles", 0, { matches: 0, rd: 350 }),
-  ],
+  ratings: [rating("overall", 4.213, { matches: 68 })],
+  is_admin: true,
 };
 
 export const OPPONENTS: PlayerMe[] = [
@@ -57,10 +51,8 @@ export const OPPONENTS: PlayerMe[] = [
     email: null,
     gender: "M",
     created_at: "2026-01-15T12:00:00Z",
-    ratings: [
-      rating("mens_singles", 3.812, { matches: 33 }),
-      rating("mens_doubles", 4.001, { matches: 22 }),
-    ],
+    ratings: [rating("overall", 3.812, { matches: 33 })],
+    is_admin: false,
   },
   {
     id: 3,
@@ -70,10 +62,8 @@ export const OPPONENTS: PlayerMe[] = [
     email: null,
     gender: "W",
     created_at: "2026-03-01T12:00:00Z",
-    ratings: [
-      rating("womens_singles", 5.105, { matches: 41 }),
-      rating("mixed_doubles", 4.420, { matches: 18 }),
-    ],
+    ratings: [rating("overall", 5.105, { matches: 41 })],
+    is_admin: false,
   },
   {
     id: 4,
@@ -84,8 +74,9 @@ export const OPPONENTS: PlayerMe[] = [
     gender: "W",
     created_at: "2026-04-10T12:00:00Z",
     ratings: [
-      rating("womens_singles", 3.205, { matches: 9, rd: 210 }), // calibrating
+      rating("overall", 3.205, { matches: 9, rd: 210 }), // calibrating
     ],
+    is_admin: false,
   },
   {
     id: 5,
@@ -96,9 +87,9 @@ export const OPPONENTS: PlayerMe[] = [
     gender: "M",
     created_at: "2025-11-20T12:00:00Z",
     ratings: [
-      rating("mens_singles", 5.987, { matches: 142, ceiling: 5.987 }), // capped
-      rating("mens_doubles", 6.110, { matches: 100 }),
+      rating("overall", 5.987, { matches: 142, ceiling: 5.987 }), // capped
     ],
+    is_admin: false,
   },
   {
     id: 6,
@@ -108,7 +99,8 @@ export const OPPONENTS: PlayerMe[] = [
     email: null,
     gender: "X",
     created_at: "2025-09-01T12:00:00Z",
-    ratings: [rating("casual", 4.500)],
+    ratings: [rating("overall", 4.5)],
+    is_admin: false,
   },
 ];
 

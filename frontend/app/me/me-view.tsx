@@ -14,18 +14,17 @@ import { cn } from "@/lib/utils";
 
 /*
  * Settings page — `/me`. The minimum onboarding surface so a brand-new
- * Clerk sign-up can pick their display name and gender, which unlocks
- * every gender-filtered ranked category (M/W Singles, M/W Doubles,
- * Mixed). Casual is open to anyone regardless.
+ * Clerk sign-up can pick their display name. Gender is optional profile
+ * metadata — anyone can play anyone, it gates nothing.
  *
  * Banner-driven onboarding: `?next=...` carries the URL the user was
- * trying to reach. After save we route them back so the gender prompt
- * never costs them more than one extra tap.
+ * trying to reach. After save we route them back so setup never costs
+ * them more than one extra tap.
  */
-const GENDER_OPTIONS: { value: PlayerGender; label: string; hint: string }[] = [
-  { value: "M", label: "Men's", hint: "M Singles, M Doubles, Mixed Doubles" },
-  { value: "W", label: "Women's", hint: "W Singles, W Doubles, Mixed Doubles" },
-  { value: "X", label: "Prefer not to say", hint: "Casual only" },
+const GENDER_OPTIONS: { value: PlayerGender; label: string }[] = [
+  { value: "M", label: "Man" },
+  { value: "W", label: "Woman" },
+  { value: "X", label: "Prefer not to say" },
 ];
 
 export function MeSettingsView() {
@@ -82,7 +81,7 @@ export function MeSettingsView() {
       />
     );
 
-  const blocked = !displayName.trim() || !gender;
+  const blocked = !displayName.trim();
 
   return (
     <main className="mx-auto w-full max-w-xl px-4 pb-24 pt-6 sm:px-6">
@@ -113,11 +112,11 @@ export function MeSettingsView() {
 
         <fieldset>
           <legend className="text-label uppercase text-text-secondary">
-            Category eligibility
+            Gender (optional)
           </legend>
           <p className="mt-1 text-caption text-text-muted">
-            Picks which ranked categories you can play in. You can always
-            play Casual regardless.
+            Shown on your profile. It doesn&apos;t limit who you can play —
+            anyone can play anyone.
           </p>
           <div className="mt-3 space-y-2">
             {GENDER_OPTIONS.map((opt) => (
@@ -138,10 +137,7 @@ export function MeSettingsView() {
                   onChange={() => setGender(opt.value)}
                   className="mt-1 h-4 w-4 accent-primary"
                 />
-                <div>
-                  <p className="text-body-md">{opt.label}</p>
-                  <p className="text-caption text-text-muted">{opt.hint}</p>
-                </div>
+                <p className="text-body-md">{opt.label}</p>
               </label>
             ))}
           </div>
@@ -155,9 +151,7 @@ export function MeSettingsView() {
 
         <div className="flex items-center justify-between gap-3 pt-2">
           <p className="text-caption text-text-secondary">
-            {blocked
-              ? "Display name and category are both required."
-              : "Ready to save."}
+            {blocked ? "Display name is required." : "Ready to save."}
           </p>
           <button
             type="button"

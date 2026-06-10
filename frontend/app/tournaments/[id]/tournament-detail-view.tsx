@@ -14,9 +14,9 @@ import {
   getTournament,
   withdrawFromTournament,
 } from "@/lib/api";
-import { CATEGORY_LABEL } from "@/lib/api/types";
 import { EntryList } from "@/components/tournament/EntryList";
 import { BracketView } from "@/components/tournament/BracketView";
+import { RankedBadge } from "../tournaments-view";
 
 /*
  * Tournament detail — public meta + entry list + bracket. Sign-up CTA
@@ -83,8 +83,9 @@ export function TournamentDetailView({ tournamentId }: { tournamentId: number })
 
       <header className="mt-3 flex flex-wrap items-baseline justify-between gap-3">
         <div>
-          <p className="text-label uppercase text-text-secondary">
-            {CATEGORY_LABEL[t.category]} · {t.format.replace("_", "-")}
+          <p className="flex items-center gap-2 text-label uppercase text-text-secondary">
+            {t.format.replace("_", "-")}
+            <RankedBadge ranked={t.ranked} />
           </p>
           <h1 className="text-h1">{t.name}</h1>
           <p className="mt-1 text-caption text-text-secondary">
@@ -128,8 +129,10 @@ export function TournamentDetailView({ tournamentId }: { tournamentId: number })
         <section className="mt-4 rounded-lg border border-info/30 bg-info/10 p-4">
           <p className="text-label uppercase text-info">Organizer controls</p>
           <p className="mt-1 text-caption text-text-secondary">
-            Generating pairings locks registration. Completing the tournament
-            triggers ceiling updates for every entrant.
+            Generating pairings locks registration.
+            {t.ranked
+              ? " Completing the tournament raises rating ceilings for every entrant."
+              : " Casual tournament — completing it doesn't change rating ceilings."}
           </p>
           <div className="mt-3 flex gap-2">
             <button

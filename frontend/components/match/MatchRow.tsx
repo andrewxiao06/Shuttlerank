@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { CATEGORY_SHORT, type CategoryMatch } from "@/lib/api/types";
+import { type CategoryMatch } from "@/lib/api/types";
 import { DeltaPill } from "./DeltaPill";
 
 /*
@@ -66,8 +66,7 @@ export function MatchRow({
             </span>
           </div>
           <p className="text-caption text-text-secondary">
-            {match.category ? CATEGORY_SHORT[match.category] : "—"} ·{" "}
-            {ago}
+            {match.participants.length > 2 ? "Doubles" : "Singles"} · {ago}
             {oppRating != null ? ` · vs ${oppRating.toFixed(2)}` : ""}
           </p>
         </div>

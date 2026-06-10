@@ -121,11 +121,9 @@ export const MATCHES: CategoryMatch[] = [
   }),
 ];
 
-export function matchesForPlayer(playerId: number, category?: RatingCategory): CategoryMatch[] {
-  return MATCHES.filter(
-    (m) =>
-      m.participants.some((p) => p.player_id === playerId) &&
-      (!category || m.category === category),
+export function matchesForPlayer(playerId: number): CategoryMatch[] {
+  return MATCHES.filter((m) =>
+    m.participants.some((p) => p.player_id === playerId),
   );
 }
 

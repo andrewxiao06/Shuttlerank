@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from badminton_rating.api.auth import current_player
+from badminton_rating.api.routes.admin import is_admin_user
 from badminton_rating.api.models.v1 import (
     PairingsOut,
     TournamentCreate,
@@ -75,7 +76,7 @@ def _to_out(t: Tournament) -> TournamentOut:
         id=t.id,
         name=t.name,
         format=t.format,
-        category=t.category,
+        ranked=t.ranked,
         starts_at=t.starts_at,
         ends_at=t.ends_at,
         status=t.status,
@@ -120,10 +121,17 @@ async def create_tournament(
     player: Player = Depends(current_player),
     session: AsyncSession = Depends(get_db),
 ) -> TournamentOut:
+    # Anyone can host a casual tournament; ranked (officially weighted,
+    # ceiling-unlocking) tournaments are admin-only.
+    if payload.ranked and not is_admin_user(player.clerk_user_id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="only administrators can host ranked tournaments",
+        )
     t = Tournament(
         name=payload.name,
         format=payload.format,
-        category=payload.category,
+        ranked=payload.ranked,
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
         status=TournamentStatus.DRAFT,
@@ -236,13 +244,12 @@ async def generate_pairings(
             detail="need at least 2 active entries to pair",
         )
 
-    # Build PairingEntry list from each entrant's current display rating
-    # in this tournament's category.
+    # Build PairingEntry list from each entrant's current display rating.
     pids = [e.player_id for e in active_entries]
     rating_rows = (await session.execute(
         select(PlayerCategoryRating).where(
             PlayerCategoryRating.player_id.in_(pids),
-            PlayerCategoryRating.category == t.category,
+            PlayerCategoryRating.category == RatingCategory.OVERALL,
         )
     )).scalars().all()
     ratings_by_pid = {r.player_id: r for r in rating_rows}
@@ -275,7 +282,7 @@ async def generate_pairings(
             team_a_score=0,
             team_b_score=0,
             winner_team=Team.A,  # placeholder — overwritten when result is recorded
-            category=t.category,
+            category=RatingCategory.OVERALL,
             status=MatchStatus.PENDING,
             tournament_id=t.id,
             round=prop.round,
@@ -337,13 +344,15 @@ async def complete_tournament(
             detail="already completed",
         )
 
+    # Ceiling unlocks are the integrity story for *ranked* tournaments only.
+    # Casual tournaments complete without touching anyone's cap.
     active_entries = [e for e in t.entries if not e.withdrawn]
     pids = [e.player_id for e in active_entries]
-    if pids:
+    if pids and t.ranked:
         rating_rows = (await session.execute(
             select(PlayerCategoryRating).where(
                 PlayerCategoryRating.player_id.in_(pids),
-                PlayerCategoryRating.category == t.category,
+                PlayerCategoryRating.category == RatingCategory.OVERALL,
             )
         )).scalars().all()
         rating_by_pid = {r.player_id: r for r in rating_rows}

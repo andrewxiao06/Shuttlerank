@@ -3,27 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { searchPlayers } from "@/lib/api";
-import type { PlayerGender, PlayerMe } from "@/lib/api/types";
+import type { PlayerMe } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 /*
- * Player picker — debounced search against `searchPlayers` mock.
- *
- * The category-driven `eligibleGenders` filter is honored both in the
- * search call and visually (a dropdown row's color flags ineligible
- * matches). `excludeIds` blocks already-picked players from showing up
- * in the other team — DESIGN.md acceptance: "selecting player in team A
- * excludes them from team B."
+ * Player picker — debounced search against `searchPlayers`. Anyone can
+ * play anyone, so there's no eligibility filtering. `excludeIds` blocks
+ * already-picked players from showing up in the other team — DESIGN.md
+ * acceptance: "selecting player in team A excludes them from team B."
  */
 export function PlayerSearch({
   onPick,
-  eligibleGenders,
   excludeIds,
   placeholder = "Search players…",
   className,
 }: {
   onPick: (player: PlayerMe) => void;
-  eligibleGenders?: PlayerGender[] | null;
   excludeIds?: number[];
   placeholder?: string;
   className?: string;
@@ -47,11 +42,8 @@ export function PlayerSearch({
   }, []);
 
   const results = useQuery({
-    queryKey: ["search-players", debounced, eligibleGenders],
-    queryFn: () =>
-      searchPlayers(debounced, {
-        eligibleGenders: eligibleGenders ?? undefined,
-      }),
+    queryKey: ["search-players", debounced],
+    queryFn: () => searchPlayers(debounced),
     enabled: open,
   });
 
