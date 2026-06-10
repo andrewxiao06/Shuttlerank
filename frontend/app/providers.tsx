@@ -39,6 +39,30 @@ function ClerkTokenBridge() {
 }
 
 /*
+ * Drop every cached query whenever the signed-in Clerk user changes
+ * (including sign-out). Without this, switching accounts in the same tab
+ * serves the previous user's cached profile/matches for up to staleTime —
+ * which looks exactly like two accounts being linked.
+ */
+function QueryCacheUserScope() {
+  const { isLoaded, userId } = useAuth();
+  const qc = useQueryClient();
+  // undefined = identity not yet observed; null = confirmed signed out.
+  const prev = useRef<string | null | undefined>(undefined);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+    const current = userId ?? null;
+    if (prev.current !== undefined && prev.current !== current) {
+      qc.clear();
+    }
+    prev.current = current;
+  }, [isLoaded, userId, qc]);
+
+  return null;
+}
+
+/*
  * Site-wide player auto-bootstrap. Runs once whenever a signed-in user
  * is detected; if the backend has no Player row for them
  * (`/players/me` → 403), POST `/v1/players/bootstrap` with their Clerk
@@ -115,6 +139,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
       <QueryClientProvider client={queryClient}>
         <ClerkTokenBridge />
+        <QueryCacheUserScope />
         <PlayerAutoBootstrap />
         {children}
       </QueryClientProvider>
