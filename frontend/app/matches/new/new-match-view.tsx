@@ -5,14 +5,11 @@ import { useRouter } from "next/navigation";
 import { useMutation } from "@tanstack/react-query";
 import { createMatch } from "@/lib/api";
 import {
-  CATEGORY_LABEL,
   CategoryMatchCreateSchema,
   type PlayerMe,
-  type RatingCategory,
 } from "@/lib/api/types";
-import { CategorySelector } from "@/components/rating/CategorySelector";
 import { PlayerSearch } from "@/components/player/PlayerSearch";
-import { rulesFor, validateTeam } from "@/lib/match-rules";
+import { rulesFor, validateTeam, type MatchFormat } from "@/lib/match-rules";
 import { cn } from "@/lib/utils";
 
 /*
@@ -21,14 +18,14 @@ import { cn } from "@/lib/utils";
  * between steps) so the user can scroll up and edit any field freely.
  *
  * Validation strategy: the form is always submittable iff the Zod schema
- * plus per-category gender rules pass. Errors render inline next to the
- * offending field so PLAN.md's "tied scores blocked inline" acceptance
- * is satisfied without a toast.
+ * plus team-size rules pass. Errors render inline next to the offending
+ * field so PLAN.md's "tied scores blocked inline" acceptance is
+ * satisfied without a toast.
  */
 export function NewMatchView() {
   const router = useRouter();
-  const [category, setCategory] = useState<RatingCategory>("mens_singles");
-  const rules = rulesFor(category);
+  const [format, setFormat] = useState<MatchFormat>("singles");
+  const rules = rulesFor(format);
 
   const [teamA, setTeamA] = useState<PlayerMe[]>([]);
   const [teamB, setTeamB] = useState<PlayerMe[]>([]);
@@ -36,12 +33,14 @@ export function NewMatchView() {
   const [scoreB, setScoreB] = useState("");
   const [playedAt, setPlayedAt] = useState(() => isoToday());
 
-  // Drop selected players whenever category rules change — avoids stale
-  // ineligible picks (e.g. a male player carried into women's singles).
-  const resetTeams = (next: RatingCategory) => {
-    setCategory(next);
-    setTeamA([]);
-    setTeamB([]);
+  // Trim teams when switching doubles → singles so stale extra picks
+  // don't linger invisibly.
+  const changeFormat = (next: MatchFormat) => {
+    setFormat(next);
+    if (next === "singles") {
+      setTeamA((t) => t.slice(0, 1));
+      setTeamB((t) => t.slice(0, 1));
+    }
   };
 
   const teamAError = validateTeam(teamA, rules, "A");
@@ -49,14 +48,13 @@ export function NewMatchView() {
 
   const payload = useMemo(
     () => ({
-      category,
       played_at: playedAt,
       team_a_player_ids: teamA.map((p) => p.id),
       team_b_player_ids: teamB.map((p) => p.id),
       team_a_score: Number(scoreA),
       team_b_score: Number(scoreB),
     }),
-    [category, playedAt, teamA, teamB, scoreA, scoreB],
+    [playedAt, teamA, teamB, scoreA, scoreB],
   );
 
   const zod = CategoryMatchCreateSchema.safeParse(payload);
@@ -72,8 +70,6 @@ export function NewMatchView() {
     onSuccess: (m) => router.push(`/matches/${m.id}`),
   });
 
-  const isCasual = category === "casual";
-
   return (
     <main className="mx-auto w-full max-w-2xl px-4 pb-32 pt-6 sm:px-6">
       <header className="space-y-1">
@@ -81,20 +77,34 @@ export function NewMatchView() {
         <h1 className="text-h1">Record a result</h1>
       </header>
 
-      {/* Step 1 — category */}
-      <Section title="1. Category">
-        <CategorySelector value={category} onChange={resetTeams} />
-        <p
-          className={cn(
-            "mt-3 rounded-md border px-3 py-2 text-caption",
-            isCasual
-              ? "border-accent/30 bg-accent-soft text-accent"
-              : "border-warning/30 bg-warning-soft text-warning",
-          )}
+      {/* Step 1 — format */}
+      <Section title="1. Format">
+        <div
+          role="tablist"
+          aria-label="Match format"
+          className="grid grid-cols-2 gap-2"
         >
-          {isCasual
-            ? "Casual matches verify instantly. Anyone in the match can report it later."
-            : "Both teams will need to approve. Auto-verifies in 7 days if no one disputes."}
+          {(["singles", "doubles"] as const).map((f) => (
+            <button
+              key={f}
+              type="button"
+              role="tab"
+              aria-selected={format === f}
+              onClick={() => changeFormat(f)}
+              className={cn(
+                "h-11 rounded-md border text-body-md capitalize",
+                format === f
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border hover:bg-surface-muted",
+              )}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        <p className="mt-3 rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-caption text-warning">
+          Everyone in the match will need to approve. Auto-verifies in 7 days
+          if no one disputes.
         </p>
         <p className="mt-2 text-caption text-text-muted">{rules.hint}</p>
       </Section>
@@ -107,7 +117,6 @@ export function NewMatchView() {
             players={teamA}
             onChange={setTeamA}
             maxSize={rules.teamSize}
-            eligibleGenders={rules.allowedGenders}
             excludeIds={teamB.map((p) => p.id)}
             error={teamAError}
           />
@@ -116,7 +125,6 @@ export function NewMatchView() {
             players={teamB}
             onChange={setTeamB}
             maxSize={rules.teamSize}
-            eligibleGenders={rules.allowedGenders}
             excludeIds={teamA.map((p) => p.id)}
             error={teamBError}
           />
@@ -158,9 +166,7 @@ export function NewMatchView() {
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-border bg-surface pb-[env(safe-area-inset-bottom)] pt-3 shadow-elevation-2 sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 sm:px-0">
           <p className="text-caption text-text-secondary">
-            {blocked ?? (ready
-              ? `Ready to submit — ${CATEGORY_LABEL[category]}`
-              : "Fill in scores to continue")}
+            {blocked ?? (ready ? "Ready to submit" : "Fill in scores to continue")}
           </p>
           <button
             type="button"
@@ -203,7 +209,6 @@ function TeamPicker({
   players,
   onChange,
   maxSize,
-  eligibleGenders,
   excludeIds,
   error,
 }: {
@@ -211,7 +216,6 @@ function TeamPicker({
   players: PlayerMe[];
   onChange: (next: PlayerMe[]) => void;
   maxSize: 1 | 2;
-  eligibleGenders: PlayerMe["gender"][] | null;
   excludeIds: number[];
   error: string | null;
 }) {
@@ -241,9 +245,6 @@ function TeamPicker({
       {canAdd ? (
         <PlayerSearch
           onPick={(p) => onChange([...players, p])}
-          eligibleGenders={
-            eligibleGenders ? (eligibleGenders.filter(Boolean) as ("M" | "W" | "X")[]) : null
-          }
           excludeIds={[...excludeIds, ...players.map((p) => p.id)]}
           placeholder={maxSize === 1 ? "Add player" : "Add player…"}
         />

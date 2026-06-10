@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import { listTournaments } from "@/lib/api";
-import { CATEGORY_LABEL, type Tournament } from "@/lib/api/types";
+import { type Tournament } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 
 /*
  * Tournaments browse — split into upcoming and past. Each card surfaces
- * the format, category, date, and entrant count — enough to decide
- * whether to tap through.
+ * the format, ranked/casual badge, date, and entrant count — enough to
+ * decide whether to tap through. Anyone can host a casual tournament.
  */
 export function TournamentsView() {
   const q = useQuery({
@@ -24,9 +24,19 @@ export function TournamentsView() {
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pb-24 pt-6 sm:px-6">
-      <header className="space-y-1">
-        <p className="text-label uppercase text-text-secondary">Tournaments</p>
-        <h1 className="text-h1">Find a tournament</h1>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-label uppercase text-text-secondary">
+            Tournaments
+          </p>
+          <h1 className="text-h1">Find a tournament</h1>
+        </div>
+        <Link
+          href="/tournaments/new"
+          className="inline-flex h-11 items-center rounded-md bg-primary px-4 text-body-md text-on-primary"
+        >
+          Host one
+        </Link>
       </header>
 
       {q.isPending ? (
@@ -73,9 +83,11 @@ function Group({
                 )}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-h3">{t.name}</p>
+                  <p className="flex items-center gap-2 truncate text-h3">
+                    {t.name}
+                    <RankedBadge ranked={t.ranked} />
+                  </p>
                   <p className="text-caption text-text-secondary">
-                    {CATEGORY_LABEL[t.category]} ·{" "}
                     {t.format.replace("_", "-")} ·{" "}
                     {new Date(t.starts_at).toLocaleDateString()}
                   </p>
@@ -92,6 +104,21 @@ function Group({
         </ul>
       )}
     </section>
+  );
+}
+
+export function RankedBadge({ ranked }: { ranked: boolean }) {
+  return (
+    <span
+      className={cn(
+        "shrink-0 rounded-full border px-2 py-0.5 text-label uppercase",
+        ranked
+          ? "border-primary/30 bg-primary/5 text-primary"
+          : "border-border bg-surface-muted text-text-secondary",
+      )}
+    >
+      {ranked ? "Ranked" : "Casual"}
+    </span>
   );
 }
 

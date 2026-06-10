@@ -1,5 +1,5 @@
 """
-V1 leaderboard + forecast — category-aware versions.
+V1 leaderboard + forecast — single universal rating.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from badminton_rating.api.models.v1 import (
     CategoryLeaderboardOut,
 )
 from badminton_rating.db.models import (
+    INITIAL_CEILING,
     Player,
     PlayerCategoryRating,
     RatingCategory,
@@ -22,7 +23,9 @@ from badminton_rating.db.session import get_db
 from badminton_rating.engine.glicko import (
     GLICKO_SCALE,
     INITIAL_R,
+    INITIAL_RD,
     expected_score,
+    from_display_rating,
     get_tier,
     to_display_rating,
 )
@@ -32,8 +35,7 @@ router = APIRouter(prefix="/v1", tags=["v1-leaderboard"])
 
 
 @router.get("/leaderboard", response_model=CategoryLeaderboardOut)
-async def category_leaderboard(
-    category: RatingCategory = Query(...),
+async def overall_leaderboard(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     min_matches: int = Query(0, ge=0),
@@ -42,14 +44,14 @@ async def category_leaderboard(
     base = (
         select(PlayerCategoryRating, Player)
         .join(Player, PlayerCategoryRating.player_id == Player.id)
-        .where(PlayerCategoryRating.category == category)
+        .where(PlayerCategoryRating.category == RatingCategory.OVERALL)
         .where(PlayerCategoryRating.match_count >= min_matches)
     )
 
     total_stmt = (
         select(func.count())
         .select_from(PlayerCategoryRating)
-        .where(PlayerCategoryRating.category == category)
+        .where(PlayerCategoryRating.category == RatingCategory.OVERALL)
         .where(PlayerCategoryRating.match_count >= min_matches)
     )
     total = (await session.execute(total_stmt)).scalar_one()
@@ -79,7 +81,6 @@ async def category_leaderboard(
             match_count=rating.match_count,
         ))
     return CategoryLeaderboardOut(
-        category=category,
         total=total,
         limit=limit,
         offset=offset,
@@ -87,14 +88,18 @@ async def category_leaderboard(
     )
 
 
+# Players who haven't played yet forecast from the same defaults a fresh
+# rating row would get — display = INITIAL_CEILING, fully uncertain.
+_DEFAULT_R = from_display_rating(INITIAL_CEILING)
+
+
 @router.get(
     "/players/{player_id}/forecast",
     response_model=CategoryForecastOut,
 )
-async def category_forecast(
+async def overall_forecast(
     player_id: int,
     opponent_id: int = Query(...),
-    category: RatingCategory = Query(...),
     session: AsyncSession = Depends(get_db),
 ) -> CategoryForecastOut:
     if player_id == opponent_id:
@@ -103,34 +108,46 @@ async def category_forecast(
             detail="player and opponent must be different",
         )
 
+    # Both players must exist — but missing rating rows are fine; any two
+    # players can be forecast against each other.
+    players = (await session.execute(
+        select(Player.id).where(Player.id.in_([player_id, opponent_id]))
+    )).scalars().all()
+    missing = {player_id, opponent_id} - set(players)
+    if missing:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"player(s) not found: {sorted(missing)}",
+        )
+
     rows = (await session.execute(
         select(PlayerCategoryRating).where(
             PlayerCategoryRating.player_id.in_([player_id, opponent_id]),
-            PlayerCategoryRating.category == category,
+            PlayerCategoryRating.category == RatingCategory.OVERALL,
         )
     )).scalars().all()
     by_pid = {r.player_id: r for r in rows}
 
-    p_row = by_pid.get(player_id)
-    o_row = by_pid.get(opponent_id)
-    if p_row is None or o_row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="one or both players have no rating in this category",
-        )
+    def stats(pid: int) -> tuple[float, float]:
+        row = by_pid.get(pid)
+        if row is None:
+            return _DEFAULT_R, INITIAL_RD
+        return row.r, row.rd
 
-    mu_p = (p_row.r - INITIAL_R) / GLICKO_SCALE
-    mu_o = (o_row.r - INITIAL_R) / GLICKO_SCALE
-    phi_o = o_row.rd / GLICKO_SCALE
+    p_r, p_rd = stats(player_id)
+    o_r, o_rd = stats(opponent_id)
+
+    mu_p = (p_r - INITIAL_R) / GLICKO_SCALE
+    mu_o = (o_r - INITIAL_R) / GLICKO_SCALE
+    phi_o = o_rd / GLICKO_SCALE
     win_p = expected_score(mu_p, mu_o, phi_o)
 
     return CategoryForecastOut(
         player_id=player_id,
         opponent_id=opponent_id,
-        category=category,
-        player_display=to_display_rating(p_row.r),
-        opponent_display=to_display_rating(o_row.r),
+        player_display=to_display_rating(p_r),
+        opponent_display=to_display_rating(o_r),
         win_probability=round(win_p, 4),
-        player_calibrating=p_row.rd > 150.0,
-        opponent_calibrating=o_row.rd > 150.0,
+        player_calibrating=p_rd > 150.0,
+        opponent_calibrating=o_rd > 150.0,
     )

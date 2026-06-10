@@ -1,33 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getPlayer, listPlayerMatches } from "@/lib/api";
-import {
-  CATEGORY_LABEL,
-  type RatingCategory,
-  type CategoryRating,
-} from "@/lib/api/types";
-import { RatingTile } from "@/components/rating/RatingTile";
+import { type CategoryRating } from "@/lib/api/types";
 import { MatchRow } from "@/components/match/MatchRow";
 import { TierChip } from "@/components/rating/TierChip";
 import { CalibrationDot } from "@/components/rating/CalibrationDot";
+import { CeilingBar } from "@/components/rating/CeilingBar";
 import { RatingHistoryChart } from "@/components/player/RatingHistoryChart";
 import { formatRating } from "@/lib/format";
 import { isCalibrating } from "@/lib/tier";
 
 /*
- * Profile view — DESIGN.md "Your rating is the hero" applied across the
- * six categories. Layout:
- *
- *   Mobile (<sm):      hero rating + horizontal-scroll rating tiles, then
- *                      chart, then match list.
- *   md ≥ tablet:       same hero, 2-col tile grid.
- *   lg ≥ desktop:      3-col tile grid.
- *
- * Category selector lives on the tiles themselves — tapping a tile
- * promotes that category into the hero spot and re-filters the chart +
- * match list without a route change.
+ * Profile view — DESIGN.md "Your rating is the hero." One universal
+ * rating per player, so the hero card is the whole story: rating, tier,
+ * calibration state, and ceiling progress. Chart + match list below.
  */
 export function ProfileView({ playerId }: { playerId: number }) {
   const playerQ = useQuery({
@@ -35,21 +22,9 @@ export function ProfileView({ playerId }: { playerId: number }) {
     queryFn: () => getPlayer(playerId),
   });
 
-  // Default to the player's best-rated active category. Recomputed once
-  // when the player loads so first paint shows a meaningful hero.
-  const [selected, setSelected] = useState<RatingCategory | null>(null);
-  const active: RatingCategory | null = useMemo(() => {
-    if (selected) return selected;
-    const ratings = playerQ.data?.ratings ?? [];
-    const played = ratings.filter((r) => r.match_count > 0);
-    if (played.length === 0) return ratings[0]?.category ?? null;
-    return played.reduce((a, b) => (b.display > a.display ? b : a)).category;
-  }, [playerQ.data, selected]);
-
   const matchesQ = useQuery({
-    queryKey: ["matches", playerId, active],
-    queryFn: () => listPlayerMatches(playerId, active ?? undefined),
-    enabled: active != null,
+    queryKey: ["matches", playerId],
+    queryFn: () => listPlayerMatches(playerId),
   });
 
   if (playerQ.isPending) return <ProfileSkeleton />;
@@ -62,79 +37,50 @@ export function ProfileView({ playerId }: { playerId: number }) {
     );
 
   const player = playerQ.data;
-  const heroRating: CategoryRating | undefined = player.ratings.find(
-    (r) => r.category === active,
-  );
+  const rating: CategoryRating | undefined = player.ratings[0];
 
   const verifiedMatches = (matchesQ.data ?? []).filter(
     (m) => m.status === "verified",
   );
-  const recentDeltaFor = (cat: RatingCategory): number | null => {
-    const last = (matchesQ.data ?? [])
-      .filter((m) => m.category === cat && m.status === "verified")
-      .at(-1);
-    if (!last) return null;
-    return last.participants.find((p) => p.player_id === playerId)?.delta_r ?? null;
-  };
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pb-24 pt-6 sm:px-6 lg:max-w-5xl">
       {/* Header */}
       <header className="space-y-1">
-        <p className="text-label uppercase text-text-secondary">
-          {player.gender === "M" ? "Men" : player.gender === "W" ? "Women" : "Player"}
-        </p>
+        <p className="text-label uppercase text-text-secondary">Player</p>
         <h1 className="text-h1">{player.display_name ?? player.name}</h1>
       </header>
 
       {/* Hero rating */}
-      {heroRating ? (
+      {rating ? (
         <section className="mt-6 rounded-xl border border-border bg-surface p-6 shadow-elevation-1">
           <div className="flex items-center justify-between">
-            <p className="text-label uppercase text-text-secondary">
-              {CATEGORY_LABEL[heroRating.category]}
-            </p>
-            <CalibrationDot show={isCalibrating(heroRating.rd)} />
+            <p className="text-label uppercase text-text-secondary">Rating</p>
+            <CalibrationDot show={isCalibrating(rating.rd)} />
           </div>
           <p className="mt-2 text-display-lg sm:text-display-xl">
-            {heroRating.match_count > 0 ? formatRating(heroRating.display) : "—"}
+            {rating.match_count > 0 ? formatRating(rating.display) : "—"}
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <TierChip rating={heroRating.display} />
+            <TierChip rating={rating.display} />
             <span className="text-caption text-text-muted">
-              {heroRating.match_count} match{heroRating.match_count === 1 ? "" : "es"}
-              {heroRating.last_active ? ` · last ${heroRating.last_active}` : ""}
+              {rating.match_count} match{rating.match_count === 1 ? "" : "es"}
+              {rating.last_active ? ` · last ${rating.last_active}` : ""}
             </span>
+          </div>
+          <div className="mt-4">
+            <CeilingBar display={rating.display} ceiling={rating.ceiling} />
+            <p className="mt-1 text-caption text-text-muted">
+              Rating cap {formatRating(rating.ceiling)} — raised by playing
+              ranked tournaments.
+            </p>
           </div>
         </section>
       ) : null}
 
-      {/* Category grid */}
-      <section className="mt-8 space-y-3">
-        <h2 className="text-h3">All categories</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {player.ratings.map((r) => (
-            <RatingTile
-              key={r.category}
-              rating={r}
-              recentDelta={recentDeltaFor(r.category)}
-              selected={r.category === active}
-              onSelect={setSelected}
-            />
-          ))}
-        </div>
-      </section>
-
       {/* History chart */}
       <section className="mt-8 space-y-3">
-        <h2 className="text-h3">
-          Rating history
-          {active ? (
-            <span className="ml-2 text-caption font-normal text-text-muted">
-              — {CATEGORY_LABEL[active]}
-            </span>
-          ) : null}
-        </h2>
+        <h2 className="text-h3">Rating history</h2>
         {matchesQ.isPending ? (
           <div className="h-44 animate-pulse rounded-lg bg-surface-muted" />
         ) : (
@@ -149,7 +95,7 @@ export function ProfileView({ playerId }: { playerId: number }) {
           <SkeletonList />
         ) : (matchesQ.data?.length ?? 0) === 0 ? (
           <div className="rounded-lg border border-dashed border-border p-6 text-center text-caption text-text-muted">
-            No matches yet in this category.
+            No matches yet.
           </div>
         ) : (
           <ul className="space-y-2">
@@ -176,12 +122,8 @@ function ProfileSkeleton() {
   return (
     <main className="mx-auto w-full max-w-3xl animate-pulse space-y-6 px-4 py-6 sm:px-6">
       <div className="h-6 w-24 rounded bg-surface-muted" />
-      <div className="h-40 rounded-xl bg-surface-muted" />
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-44 rounded-xl bg-surface-muted" />
-        ))}
-      </div>
+      <div className="h-48 rounded-xl bg-surface-muted" />
+      <div className="h-44 rounded-lg bg-surface-muted" />
     </main>
   );
 }

@@ -30,6 +30,10 @@ def _admin_user_ids() -> Set[str]:
     return {x.strip() for x in raw.split(",") if x.strip()}
 
 
+def is_admin_user(clerk_user_id: str | None) -> bool:
+    return clerk_user_id is not None and clerk_user_id in _admin_user_ids()
+
+
 async def require_admin(player: Player = Depends(current_player)) -> Player:
     if player.clerk_user_id not in _admin_user_ids():
         raise HTTPException(

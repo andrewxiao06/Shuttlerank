@@ -3,41 +3,29 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getForecast } from "@/lib/api";
-import {
-  CATEGORY_LABEL,
-  type PlayerMe,
-  type RatingCategory,
-} from "@/lib/api/types";
-import { CategorySelector } from "@/components/rating/CategorySelector";
+import { type PlayerMe } from "@/lib/api/types";
 import { PlayerSearch } from "@/components/player/PlayerSearch";
 import { TierChip } from "@/components/rating/TierChip";
 import { CalibrationDot } from "@/components/rating/CalibrationDot";
 import { formatPercent, formatRating } from "@/lib/format";
 
 /*
- * Forecast — DESIGN.md spec: two player pickers + category + the big
- * "X%" number. The locked semantic for "forecast probability" is
- * `info` (blue), not `accent`, so the headline number uses that.
+ * Forecast — DESIGN.md spec: two player pickers + the big "X%" number.
+ * One universal rating means any two players can be compared. The locked
+ * semantic for "forecast probability" is `info` (blue), not `accent`, so
+ * the headline number uses that.
  *
  * Calibration warning fires when *either* side is still calibrating —
  * the forecast still renders, but the user is told the number is soft.
  */
 export function ForecastView() {
-  const [category, setCategory] = useState<RatingCategory>("mens_singles");
   const [you, setYou] = useState<PlayerMe | null>(null);
   const [opp, setOpp] = useState<PlayerMe | null>(null);
 
-  // Reset both picks when category changes — eligibility can drop a player
-  const onCategory = (c: RatingCategory) => {
-    setCategory(c);
-    setYou(null);
-    setOpp(null);
-  };
-
   const ready = you != null && opp != null && you.id !== opp.id;
   const q = useQuery({
-    queryKey: ["forecast", you?.id, opp?.id, category],
-    queryFn: () => getForecast(you!.id, opp!.id, category),
+    queryKey: ["forecast", you?.id, opp?.id],
+    queryFn: () => getForecast(you!.id, opp!.id),
     enabled: ready,
   });
 
@@ -49,13 +37,6 @@ export function ForecastView() {
       </header>
 
       <section className="mt-5 space-y-4 rounded-lg border border-border bg-surface p-4">
-        <div>
-          <p className="mb-2 text-label uppercase text-text-secondary">
-            Category
-          </p>
-          <CategorySelector value={category} onChange={onCategory} />
-        </div>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <PlayerSlot label="You" player={you} onPick={setYou} excludeIds={opp ? [opp.id] : []} />
           <PlayerSlot label="Opponent" player={opp} onPick={setOpp} excludeIds={you ? [you.id] : []} />
@@ -80,9 +61,6 @@ export function ForecastView() {
             </p>
             <p className="mt-2 text-display-xl text-info">
               {formatPercent(q.data.win_probability)}
-            </p>
-            <p className="mt-1 text-caption text-text-muted">
-              in {CATEGORY_LABEL[category]}
             </p>
           </div>
 

@@ -18,7 +18,12 @@ import { z } from "zod";
 // Enums — mirror badminton_rating/db/models.py
 // ---------------------------------------------------------------------------
 
+/**
+ * "overall" is the only bucket written today — one rating per player.
+ * Legacy values remain so historical match rows still parse.
+ */
 export const RatingCategorySchema = z.enum([
+  "overall",
   "mens_singles",
   "womens_singles",
   "mens_doubles",
@@ -27,14 +32,6 @@ export const RatingCategorySchema = z.enum([
   "casual",
 ]);
 export type RatingCategory = z.infer<typeof RatingCategorySchema>;
-
-export const RANKED_CATEGORIES = [
-  "mens_singles",
-  "womens_singles",
-  "mens_doubles",
-  "womens_doubles",
-  "mixed_doubles",
-] as const satisfies readonly RatingCategory[];
 
 export const PlayerGenderSchema = z.enum(["M", "W", "X"]);
 export type PlayerGender = z.infer<typeof PlayerGenderSchema>;
@@ -85,6 +82,7 @@ export type TournamentStatus = z.infer<typeof TournamentStatusSchema>;
 // ---------------------------------------------------------------------------
 
 export const CATEGORY_LABEL: Record<RatingCategory, string> = {
+  overall: "Overall",
   mens_singles: "Men's singles",
   womens_singles: "Women's singles",
   mens_doubles: "Men's doubles",
@@ -94,6 +92,7 @@ export const CATEGORY_LABEL: Record<RatingCategory, string> = {
 };
 
 export const CATEGORY_SHORT: Record<RatingCategory, string> = {
+  overall: "Match",
   mens_singles: "M Singles",
   womens_singles: "W Singles",
   mens_doubles: "M Doubles",
@@ -134,7 +133,10 @@ export const PlayerMeSchema = z.object({
   email: z.string().nullable(),
   gender: PlayerGenderSchema.nullable(),
   created_at: z.string(),
+  // Single-element list holding the player's one overall rating.
   ratings: z.array(CategoryRatingSchema),
+  // True when the player can host ranked tournaments.
+  is_admin: z.boolean().optional().default(false),
 });
 export type PlayerMe = z.infer<typeof PlayerMeSchema>;
 
@@ -159,7 +161,6 @@ export type PlayerBootstrap = z.infer<typeof PlayerBootstrapSchema>;
 
 export const CategoryMatchCreateSchema = z
   .object({
-    category: RatingCategorySchema,
     played_at: z.string(), // YYYY-MM-DD
     team_a_player_ids: z.array(z.number().int()).min(1).max(2),
     team_b_player_ids: z.array(z.number().int()).min(1).max(2),
@@ -268,9 +269,10 @@ export type Leaderboard = z.infer<typeof LeaderboardSchema>;
 // ---------------------------------------------------------------------------
 
 export const TournamentCreateSchema = z.object({
-  name: z.string().max(200),
+  name: z.string().min(1).max(200),
   format: TournamentFormatSchema,
-  category: RatingCategorySchema,
+  // Ranked tournaments are admin-only; everyone can host casual ones.
+  ranked: z.boolean(),
   starts_at: z.string(),
   ends_at: z.string().nullable().optional(),
 });
@@ -288,7 +290,7 @@ export const TournamentSchema = z.object({
   id: z.number().int(),
   name: z.string(),
   format: TournamentFormatSchema,
-  category: RatingCategorySchema,
+  ranked: z.boolean(),
   starts_at: z.string(),
   ends_at: z.string().nullable(),
   status: TournamentStatusSchema,
@@ -309,7 +311,6 @@ export type Pairings = z.infer<typeof PairingsSchema>;
 export const ForecastSchema = z.object({
   player_id: z.number().int(),
   opponent_id: z.number().int(),
-  category: RatingCategorySchema,
   player_display: z.number(),
   opponent_display: z.number(),
   win_probability: z.number().min(0).max(1),

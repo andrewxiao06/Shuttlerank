@@ -105,7 +105,13 @@ class PlayerGender(str, enum.Enum):
 
 
 class RatingCategory(str, enum.Enum):
-    """The six rating buckets. Casual is the open-everyone fallback."""
+    """
+    Rating buckets. OVERALL is the only bucket written today — every player
+    has exactly one rating regardless of format or gender. The legacy
+    gendered/casual values remain so historical match rows still deserialize.
+    """
+    OVERALL = "overall"
+    # Legacy values — read-only, kept for old rows.
     MENS_SINGLES = "mens_singles"
     WOMENS_SINGLES = "womens_singles"
     MENS_DOUBLES = "mens_doubles"
@@ -469,8 +475,11 @@ class Tournament(Base):
     format: Mapped[TournamentFormat] = mapped_column(
         Enum(TournamentFormat, name="tournamentformat"), nullable=False
     )
-    category: Mapped[RatingCategory] = mapped_column(
-        Enum(RatingCategory, name="ratingcategory"), nullable=False
+    # Ranked tournaments are admin-hosted and carry full TOURNAMENT weight
+    # plus ceiling unlocks; anyone can host an unranked (casual) tournament.
+    ranked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    category: Mapped[Optional[RatingCategory]] = mapped_column(
+        Enum(RatingCategory, name="ratingcategory"), nullable=True
     )
     starts_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False

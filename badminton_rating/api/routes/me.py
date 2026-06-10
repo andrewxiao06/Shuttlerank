@@ -21,9 +21,20 @@ from badminton_rating.api.models.v1 import (
     PlayerMeOut,
     PlayerMePatch,
 )
-from badminton_rating.db.models import Player, PlayerCategoryRating
+from badminton_rating.api.routes.admin import is_admin_user
+from badminton_rating.db.models import (
+    INITIAL_CEILING,
+    Player,
+    PlayerCategoryRating,
+    RatingCategory,
+)
 from badminton_rating.db.session import get_db
-from badminton_rating.engine.glicko import get_tier, to_display_rating
+from badminton_rating.engine.glicko import (
+    INITIAL_RD,
+    from_display_rating,
+    get_tier,
+    to_display_rating,
+)
 
 
 router = APIRouter(prefix="/players", tags=["players"])
@@ -32,26 +43,42 @@ router = APIRouter(prefix="/players", tags=["players"])
 async def _category_ratings(
     session: AsyncSession, player_id: int
 ) -> List[CategoryRatingOut]:
-    rows = (await session.execute(
+    """The player's single OVERALL rating, as a one-element list.
+
+    Players who haven't played yet get the same defaults a fresh rating row
+    would have, so every profile (and forecast) always shows a rating.
+    """
+    row = (await session.execute(
         select(PlayerCategoryRating).where(
-            PlayerCategoryRating.player_id == player_id
+            PlayerCategoryRating.player_id == player_id,
+            PlayerCategoryRating.category == RatingCategory.OVERALL,
         )
-    )).scalars().all()
-    out: List[CategoryRatingOut] = []
-    for row in rows:
-        display = to_display_rating(row.r)
-        out.append(CategoryRatingOut(
-            category=row.category,
-            r=row.r,
-            rd=row.rd,
+    )).scalar_one_or_none()
+    if row is None:
+        display = INITIAL_CEILING
+        return [CategoryRatingOut(
+            category=RatingCategory.OVERALL,
+            r=from_display_rating(display),
+            rd=INITIAL_RD,
             display=display,
             tier=get_tier(display),
-            calibrating=row.rd > 150.0,
-            ceiling=row.ceiling,
-            match_count=row.match_count,
-            last_active=row.last_active,
-        ))
-    return out
+            calibrating=True,
+            ceiling=INITIAL_CEILING,
+            match_count=0,
+            last_active=None,
+        )]
+    display = to_display_rating(row.r)
+    return [CategoryRatingOut(
+        category=row.category,
+        r=row.r,
+        rd=row.rd,
+        display=display,
+        tier=get_tier(display),
+        calibrating=row.rd > 150.0,
+        ceiling=row.ceiling,
+        match_count=row.match_count,
+        last_active=row.last_active,
+    )]
 
 
 @router.get("/me", response_model=PlayerMeOut)
@@ -68,6 +95,7 @@ async def get_me(
         gender=player.gender,
         created_at=player.created_at,
         ratings=await _category_ratings(session, player.id),
+        is_admin=is_admin_user(player.clerk_user_id),
     )
 
 
@@ -92,4 +120,5 @@ async def patch_me(
         gender=player.gender,
         created_at=player.created_at,
         ratings=await _category_ratings(session, player.id),
+        is_admin=is_admin_user(player.clerk_user_id),
     )

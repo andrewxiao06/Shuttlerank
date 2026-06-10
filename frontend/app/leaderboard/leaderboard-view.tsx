@@ -5,11 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { getLeaderboard, getMe } from "@/lib/api";
-import {
-  RatingCategorySchema,
-  type RatingCategory,
-} from "@/lib/api/types";
-import { CategorySelector } from "@/components/rating/CategorySelector";
 import { TierChip } from "@/components/rating/TierChip";
 import { CalibrationDot } from "@/components/rating/CalibrationDot";
 import { formatRating } from "@/lib/format";
@@ -28,10 +23,6 @@ export function LeaderboardView() {
   const router = useRouter();
   const params = useSearchParams();
 
-  const parsedCategory = RatingCategorySchema.safeParse(params.get("category"));
-  const category: RatingCategory = parsedCategory.success
-    ? parsedCategory.data
-    : "mens_singles";
   const offset = Math.max(0, Number(params.get("offset") ?? 0) || 0);
   const hideProvisional = params.get("hideProvisional") === "1";
 
@@ -49,9 +40,9 @@ export function LeaderboardView() {
 
   const meQ = useQuery({ queryKey: ["me"], queryFn: getMe });
   const lbQ = useQuery({
-    queryKey: ["leaderboard", category, offset, hideProvisional],
+    queryKey: ["leaderboard", offset, hideProvisional],
     queryFn: () =>
-      getLeaderboard(category, {
+      getLeaderboard({
         limit: PAGE_SIZE,
         offset,
         hideProvisional,
@@ -69,15 +60,6 @@ export function LeaderboardView() {
         <p className="text-label uppercase text-text-secondary">Leaderboard</p>
         <h1 className="text-h1">Where you stand</h1>
       </header>
-
-      <div className="mt-5">
-        <CategorySelector
-          value={category}
-          onChange={(c) =>
-            update({ category: c, offset: null })
-          }
-        />
-      </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <label className="inline-flex items-center gap-2 text-caption text-text-secondary">
@@ -116,7 +98,7 @@ export function LeaderboardView() {
           </p>
         ) : data!.entries.length === 0 ? (
           <p className="p-6 text-center text-caption text-text-muted">
-            No players ranked in this category yet.
+            No players ranked yet.
           </p>
         ) : (
           <ul>

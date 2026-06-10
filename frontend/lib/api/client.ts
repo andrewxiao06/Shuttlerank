@@ -29,12 +29,12 @@ import {
   type Forecast,
   type Leaderboard,
   type PlayerBootstrap,
-  type PlayerGender,
   type PlayerMe,
   type PlayerMePatch,
-  type RatingCategory,
   type ReportCreate,
   type Tournament,
+  type TournamentCreate,
+  type Validation,
   type ValidationCreate,
 } from "./types";
 import { z } from "zod";
@@ -147,12 +147,10 @@ export async function getPlayer(id: number): Promise<PlayerMe> {
 
 export async function listPlayerMatches(
   playerId: number,
-  category?: RatingCategory,
 ): Promise<CategoryMatch[]> {
   return request(
     `/v1/players/${playerId}/matches`,
     z.array(CategoryMatchSchema),
-    { query: { category } },
   );
 }
 
@@ -178,10 +176,12 @@ export async function listPendingForMe(): Promise<CategoryMatch[]> {
 export async function validateMatch(
   matchId: number,
   body: ValidationCreate,
-): Promise<CategoryMatch> {
+): Promise<Validation> {
+  // The backend returns the ValidationOut row, not the match — parsing the
+  // match shape here was why every inbox approval threw SchemaMismatchError.
   return request(
     `/v1/matches/${matchId}/validate`,
-    CategoryMatchSchema,
+    ValidationSchema,
     { method: "POST", body },
   );
 }
@@ -202,15 +202,15 @@ export async function reportMatch(
 // ---------------------------------------------------------------------------
 
 export async function getLeaderboard(
-  category: RatingCategory,
   opts: { limit?: number; offset?: number; hideProvisional?: boolean } = {},
 ): Promise<Leaderboard> {
   return request("/v1/leaderboard", LeaderboardSchema, {
     query: {
-      category,
       limit: opts.limit,
       offset: opts.offset,
-      hide_provisional: opts.hideProvisional ? "1" : undefined,
+      // Backend has no hide_provisional param yet; min_matches=10 keeps the
+      // ranked board free of fresh accounts when the box is ticked.
+      min_matches: opts.hideProvisional ? 10 : undefined,
     },
   });
 }
@@ -222,10 +222,9 @@ export async function getLeaderboard(
 export async function getForecast(
   playerId: number,
   opponentId: number,
-  category: RatingCategory,
 ): Promise<Forecast> {
   return request(`/v1/players/${playerId}/forecast`, ForecastSchema, {
-    query: { opponent_id: opponentId, category },
+    query: { opponent_id: opponentId },
   });
 }
 
@@ -235,6 +234,15 @@ export async function getForecast(
 
 export async function listTournaments(): Promise<Tournament[]> {
   return request("/tournaments", z.array(TournamentSchema));
+}
+
+export async function createTournament(
+  body: TournamentCreate,
+): Promise<Tournament> {
+  return request("/tournaments", TournamentSchema, {
+    method: "POST",
+    body,
+  });
 }
 
 export async function getTournament(id: number): Promise<Tournament> {
@@ -277,33 +285,10 @@ export async function completeTournament(id: number): Promise<Tournament> {
 // `/v1/players?q=` endpoint and wire here.
 // ---------------------------------------------------------------------------
 
-export async function searchPlayers(
-  query: string,
-  opts: { eligibleGenders?: PlayerGender[] | null } = {},
-): Promise<PlayerMe[]> {
-  // FastAPI expects repeated `?gender=M&gender=W` for List[Enum] params,
-  // which URLSearchParams supports natively (`.append`). The shared
-  // `request()` helper only does single-value query strings, so we build
-  // the URL by hand and call fetch directly here.
-  const url = new URL("/v1/players", BASE_URL + "/");
-  if (query) url.searchParams.set("q", query);
-  url.searchParams.set("limit", "10");
-  for (const g of opts.eligibleGenders ?? []) {
-    url.searchParams.append("gender", g);
-  }
-
-  const headers: Record<string, string> = { Accept: "application/json" };
-  const token = await getAuthToken();
-  if (token) headers["Authorization"] = `Bearer ${token}`;
-  const userId = getUserId();
-  if (userId) headers["X-Clerk-User-Id"] = userId;
-
-  const res = await fetch(url.toString(), { headers, credentials: "include" });
-  if (!res.ok) throw new ApiError(res.status, res.statusText);
-  const json = await res.json();
-  const parsed = z.array(PlayerMeSchema).safeParse(json);
-  if (!parsed.success) throw new SchemaMismatchError("/v1/players", parsed.error.issues);
-  return parsed.data;
+export async function searchPlayers(query: string): Promise<PlayerMe[]> {
+  return request("/v1/players", z.array(PlayerMeSchema), {
+    query: { q: query || undefined, limit: 10 },
+  });
 }
 
 // Re-export ValidationSchema for parity with mock (used by future test code).

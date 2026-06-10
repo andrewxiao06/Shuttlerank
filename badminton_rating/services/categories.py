@@ -1,28 +1,19 @@
 """
-Category-routed match service — v1 path.
+Match submission service — v1 path, single universal rating.
 
-What changed vs. services/matches.py
-------------------------------------
-The v0 service (matches.py) reads/writes the denormalized singles_* /
-doubles_* columns on `players`. That keeps working — this module is a
-PARALLEL path. It uses the v1 child table `player_ratings`
-(PlayerCategoryRating) keyed by (player_id, category).
+Every player has exactly one rating (RatingCategory.OVERALL) regardless of
+format or gender — anyone can play anyone. What varies is the *weight* a
+match carries, DUPR-style:
 
-Responsibilities
-----------------
-1. Validate the submission's *gender eligibility* — mens_singles requires
-   two male players, mixed_doubles requires 1M+1W per team, casual ignores
-   gender entirely.
-2. Resolve or auto-create the PlayerCategoryRating row for every
-   participant in the requested category.
-3. For CASUAL submissions: immediately run the engine, apply the ceiling
-   clamp, and persist with `status=VERIFIED`.
-4. For RANKED submissions: persist with `status=PENDING` and do NOT apply
-   any rating change yet. Phase 2.6 adds the verify endpoint that flips
-   PENDING → VERIFIED and runs `_run_and_persist_rating_update`.
+  - regular (self-reported) match ........ MatchType.CASUAL (0.6)
+  - unranked tournament match ............ MatchType.CLUB (1.0)
+  - ranked (admin-hosted) tournament ..... MatchType.TOURNAMENT (1.4)
+
+All non-tournament submissions persist as PENDING and only move ratings
+once every participant approves (the submitter auto-approves on submit)
+or the expiry window lapses.
 
 Invariant guarded here: ratings only move when a match is `VERIFIED`.
-Everything else is upstream of the engine.
 """
 
 from __future__ import annotations
@@ -38,22 +29,21 @@ from badminton_rating.engine.glicko import (
     MatchType,
     PlayerRating,
     apply_ceiling,
-    from_display_rating,
     process_match,
-    to_display_rating,
 )
 from badminton_rating.db.models import (
-    INITIAL_CEILING,
     Match,
     MatchMode,
     MatchPlayer,
     MatchStatus,
     MatchTypeDB,
+    MatchValidation,
     Player,
     PlayerCategoryRating,
-    PlayerGender,
     RatingCategory,
     Team,
+    Tournament,
+    ValidationAction,
 )
 
 
@@ -62,7 +52,7 @@ from badminton_rating.db.models import (
 # ---------------------------------------------------------------------------
 
 class CategorySubmissionError(ValueError):
-    """Business-rule violation on a category-routed match submission."""
+    """Business-rule violation on a match submission."""
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +61,6 @@ class CategorySubmissionError(ValueError):
 
 @dataclass(frozen=True)
 class CategoryMatchSubmission:
-    category: RatingCategory
     played_at: date
     team_a_player_ids: List[int]
     team_b_player_ids: List[int]
@@ -81,53 +70,23 @@ class CategoryMatchSubmission:
 
     @property
     def is_doubles(self) -> bool:
-        if self.category is RatingCategory.CASUAL:
-            # Casual is one rating covering both formats — infer mode from
-            # the submission. Validated for size consistency in _validate_shape.
-            return len(self.team_a_player_ids) == 2
-        return self.category in DOUBLES_CATEGORIES
-
-    @property
-    def is_casual(self) -> bool:
-        return self.category is RatingCategory.CASUAL
+        return len(self.team_a_player_ids) == 2
 
 
-DOUBLES_CATEGORIES = frozenset({
-    RatingCategory.MENS_DOUBLES,
-    RatingCategory.WOMENS_DOUBLES,
-    RatingCategory.MIXED_DOUBLES,
-})
-
-# Auto-verify ranked matches if no validation action lands within this window.
-RANKED_EXPIRY_DAYS = 7
+# Auto-verify pending matches if no validation action lands within this window.
+PENDING_EXPIRY_DAYS = 7
 
 
 # ---------------------------------------------------------------------------
-# Eligibility — the only thing that knows about gender
+# Shape validation — team sizes, distinct players, sane scores
 # ---------------------------------------------------------------------------
-
-def _team_size(category: RatingCategory) -> Optional[int]:
-    """Required team size for a category; None means infer from submission."""
-    if category in DOUBLES_CATEGORIES:
-        return 2
-    if category is RatingCategory.CASUAL:
-        return None  # casual covers both singles and doubles
-    return 1  # mens_singles, womens_singles
-
 
 def _validate_shape(sub: CategoryMatchSubmission) -> None:
-    expected = _team_size(sub.category)
     a, b = len(sub.team_a_player_ids), len(sub.team_b_player_ids)
-    if expected is None:
-        # Casual: any size 1 or 2, but both teams must match.
-        if a != b:
-            raise CategorySubmissionError("both teams must have the same number of players")
-        if a not in (1, 2):
-            raise CategorySubmissionError("casual matches must be 1v1 or 2v2")
-    elif a != expected or b != expected:
-        raise CategorySubmissionError(
-            f"{sub.category.value} match requires {expected} player(s) per team"
-        )
+    if a != b:
+        raise CategorySubmissionError("both teams must have the same number of players")
+    if a not in (1, 2):
+        raise CategorySubmissionError("matches must be 1v1 or 2v2")
     all_ids = sub.team_a_player_ids + sub.team_b_player_ids
     if len(set(all_ids)) != len(all_ids):
         raise CategorySubmissionError("a player cannot appear more than once in a match")
@@ -135,47 +94,6 @@ def _validate_shape(sub: CategoryMatchSubmission) -> None:
         raise CategorySubmissionError("scores must be non-negative")
     if sub.team_a_score == sub.team_b_score:
         raise CategorySubmissionError("matches must have a winner — scores cannot be tied")
-
-
-def _validate_eligibility(
-    category: RatingCategory,
-    team_a: Sequence[Player],
-    team_b: Sequence[Player],
-) -> None:
-    """Enforce per-category gender rules. Casual is the open fallback."""
-    if category is RatingCategory.CASUAL:
-        return  # anything goes
-
-    def gender_of(p: Player) -> Optional[PlayerGender]:
-        return p.gender
-
-    if category in (RatingCategory.MENS_SINGLES, RatingCategory.MENS_DOUBLES):
-        for p in (*team_a, *team_b):
-            if gender_of(p) is not PlayerGender.M:
-                raise CategorySubmissionError(
-                    f"{category.value} requires all male players; "
-                    f"{p.name} is {p.gender}"
-                )
-        return
-
-    if category in (RatingCategory.WOMENS_SINGLES, RatingCategory.WOMENS_DOUBLES):
-        for p in (*team_a, *team_b):
-            if gender_of(p) is not PlayerGender.W:
-                raise CategorySubmissionError(
-                    f"{category.value} requires all female players; "
-                    f"{p.name} is {p.gender}"
-                )
-        return
-
-    if category is RatingCategory.MIXED_DOUBLES:
-        for label, team in (("A", team_a), ("B", team_b)):
-            genders = sorted([g for g in (gender_of(p) for p in team) if g is not None])
-            if genders != [PlayerGender.M, PlayerGender.W]:
-                raise CategorySubmissionError(
-                    f"mixed_doubles requires one male and one female per team; "
-                    f"team {label} is {[g.value if g else None for g in (gender_of(p) for p in team)]}"
-                )
-        return
 
 
 # ---------------------------------------------------------------------------
@@ -202,22 +120,21 @@ async def _load_players_locked(
     return found
 
 
-async def _get_or_create_category_rating(
+async def get_or_create_overall_rating(
     session: AsyncSession,
     player_id: int,
-    category: RatingCategory,
 ) -> PlayerCategoryRating:
-    """Look up the (player, category) row; create with defaults if missing."""
+    """Look up the player's single rating row; create with defaults if missing."""
     stmt = select(PlayerCategoryRating).where(
         PlayerCategoryRating.player_id == player_id,
-        PlayerCategoryRating.category == category,
+        PlayerCategoryRating.category == RatingCategory.OVERALL,
     ).with_for_update()
     row = (await session.execute(stmt)).scalar_one_or_none()
     if row is not None:
         return row
     # Model defaults handle starting r (= from_display_rating(INITIAL_CEILING))
     # and ceiling — see db/models.PlayerCategoryRating._INITIAL_CATEGORY_R.
-    row = PlayerCategoryRating(player_id=player_id, category=category)
+    row = PlayerCategoryRating(player_id=player_id, category=RatingCategory.OVERALL)
     session.add(row)
     await session.flush()
     return row
@@ -241,9 +158,7 @@ def _apply_rating_to_row(row: PlayerCategoryRating, rating: PlayerRating) -> Non
 
 
 # ---------------------------------------------------------------------------
-# Doubles aggregation — same as v0 service, repeated here so this module
-# doesn't reach across into matches.py's helpers (keeps the two paths
-# fully independent during the additive-migration window).
+# Doubles aggregation
 # ---------------------------------------------------------------------------
 
 def _aggregate_team(ratings: Sequence[PlayerRating]) -> PlayerRating:
@@ -274,7 +189,7 @@ def _apply_team_delta(
 
 
 # ---------------------------------------------------------------------------
-# Engine driver — runs rating math and applies the ceiling clamp
+# Engine driver — runs rating math with an explicit weight
 # ---------------------------------------------------------------------------
 
 def _compute_post_ratings(
@@ -282,14 +197,8 @@ def _compute_post_ratings(
     pre_b: List[PlayerRating],
     sub: CategoryMatchSubmission,
     winner_team: Team,
+    engine_match_type: MatchType,
 ) -> Tuple[List[PlayerRating], List[PlayerRating]]:
-    # Casual matches use CASUAL weight; everything else is CLUB-weight by
-    # default. Tournament matches lift to TOURNAMENT weight in Phase 2.6
-    # when the route knows whether `match.tournament_id` is set.
-    engine_match_type = (
-        MatchType.CASUAL if sub.is_casual else MatchType.CLUB
-    )
-
     if not sub.is_doubles:
         winner_pre, loser_pre = (
             (pre_a[0], pre_b[0]) if winner_team is Team.A else (pre_b[0], pre_a[0])
@@ -339,6 +248,16 @@ def _clamp_each(
     return [apply_ceiling(p, c) for p, c in zip(posts, ceilings)]
 
 
+async def _engine_weight_for(session: AsyncSession, match: Match) -> MatchType:
+    """DUPR-style weighting: only official (ranked) tournaments carry full weight."""
+    if match.tournament_id is None:
+        return MatchType.CASUAL
+    tournament = await session.get(Tournament, match.tournament_id)
+    if tournament is not None and tournament.ranked:
+        return MatchType.TOURNAMENT
+    return MatchType.CLUB
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -348,10 +267,9 @@ async def submit_category_match(
     sub: CategoryMatchSubmission,
 ) -> Match:
     """
-    Process a category-routed submission.
-
-    Casual → status=VERIFIED, ratings apply now.
-    Ranked → status=PENDING, ratings NOT applied (Phase 2.6 verify flow).
+    Persist a match submission as PENDING. Ratings are NOT applied until
+    every participant approves (verify_pending_match) or the window lapses.
+    The submitter's approval is recorded automatically.
     """
     _validate_shape(sub)
     winner_team = Team.A if sub.team_a_score > sub.team_b_score else Team.B
@@ -362,91 +280,58 @@ async def submit_category_match(
     }
     team_a = [players_by_id[pid] for pid in sub.team_a_player_ids]
     team_b = [players_by_id[pid] for pid in sub.team_b_player_ids]
-    _validate_eligibility(sub.category, team_a, team_b)
 
-    # Always materialize the PlayerCategoryRating rows up front so the
-    # display-rating ceiling check uses authoritative state. For ranked
-    # PENDING matches we still touch them — but only to read, never write.
+    # Materialize rating rows up front so the audit snapshot uses
+    # authoritative state — read-only here, written on verify.
     rating_rows = {}
     for player in (*team_a, *team_b):
-        rating_rows[player.id] = await _get_or_create_category_rating(
-            session, player.id, sub.category
+        rating_rows[player.id] = await get_or_create_overall_rating(
+            session, player.id
         )
 
-    # Persist the Match shell first so participants/validations link to it.
     now = datetime.now(timezone.utc)
-    if sub.is_casual:
-        status = MatchStatus.VERIFIED
-        verified_at = now
-        expires_at = None
-    else:
-        status = MatchStatus.PENDING
-        verified_at = None
-        expires_at = now + timedelta(days=RANKED_EXPIRY_DAYS)
-
     match = Match(
         played_at=sub.played_at,
-        mode=MatchMode.SINGLES if not sub.is_doubles else MatchMode.DOUBLES,
-        match_type=MatchTypeDB.CASUAL if sub.is_casual else MatchTypeDB.CLUB,
+        mode=MatchMode.DOUBLES if sub.is_doubles else MatchMode.SINGLES,
+        match_type=MatchTypeDB.CASUAL,
         team_a_score=sub.team_a_score,
         team_b_score=sub.team_b_score,
         winner_team=winner_team,
-        category=sub.category,
-        status=status,
+        category=RatingCategory.OVERALL,
+        status=MatchStatus.PENDING,
         submitted_by_user_id=sub.submitted_by_user_id,
-        verified_at=verified_at,
-        expires_at=expires_at,
+        verified_at=None,
+        expires_at=now + timedelta(days=PENDING_EXPIRY_DAYS),
     )
     session.add(match)
 
-    if status is MatchStatus.PENDING:
-        # Audit row capture only — pre == post, delta == 0. Phase 2.6's
-        # verify step will rewrite these rows with the real deltas.
-        for player in team_a:
+    # Audit row capture only — pre == post, delta == 0. The verify step
+    # rewrites these rows with the real deltas.
+    for team, players in ((Team.A, team_a), (Team.B, team_b)):
+        for player in players:
             pre = _rating_from_row(rating_rows[player.id])
             match.participants.append(
                 MatchPlayer.from_update(
-                    player_id=player.id, team=Team.A, pre=pre, post=pre
+                    player_id=player.id, team=team, pre=pre, post=pre
                 )
             )
-        for player in team_b:
-            pre = _rating_from_row(rating_rows[player.id])
-            match.participants.append(
-                MatchPlayer.from_update(
-                    player_id=player.id, team=Team.B, pre=pre, post=pre
-                )
-            )
-        await session.flush()
-        return match
-
-    # CASUAL → run the engine now.
-    pre_a = [_rating_from_row(rating_rows[p.id]) for p in team_a]
-    pre_b = [_rating_from_row(rating_rows[p.id]) for p in team_b]
-    post_a, post_b = _compute_post_ratings(pre_a, pre_b, sub, winner_team)
-
-    ceil_a = [rating_rows[p.id].ceiling for p in team_a]
-    ceil_b = [rating_rows[p.id].ceiling for p in team_b]
-    post_a = _clamp_each(post_a, ceil_a)
-    post_b = _clamp_each(post_b, ceil_b)
-
-    for player, pre, post in zip(team_a, pre_a, post_a):
-        _apply_rating_to_row(rating_rows[player.id], post)
-        match.participants.append(
-            MatchPlayer.from_update(player_id=player.id, team=Team.A, pre=pre, post=post)
-        )
-    for player, pre, post in zip(team_b, pre_b, post_b):
-        _apply_rating_to_row(rating_rows[player.id], post)
-        match.participants.append(
-            MatchPlayer.from_update(player_id=player.id, team=Team.B, pre=pre, post=post)
-        )
-
     await session.flush()
+
+    # Submitting is approving — record the submitter's validation so the
+    # match only waits on the *other* participants.
+    if sub.submitted_by_user_id is not None:
+        session.add(MatchValidation(
+            match_id=match.id,
+            user_id=sub.submitted_by_user_id,
+            action=ValidationAction.APPROVED,
+        ))
+        await session.flush()
+
     return match
 
 
 # ---------------------------------------------------------------------------
-# Verification — used by Phase 2.6 routes; included here so the engine
-# integration lives next to its sibling submission flow.
+# Verification — flips PENDING → VERIFIED and applies rating updates
 # ---------------------------------------------------------------------------
 
 async def verify_pending_match(
@@ -454,7 +339,7 @@ async def verify_pending_match(
     match: Match,
 ) -> Match:
     """
-    Flip a PENDING ranked match to VERIFIED and apply rating updates.
+    Flip a PENDING match to VERIFIED and apply rating updates.
 
     Assumes the caller has already confirmed all participants approved
     (or the auto-verify window has elapsed). This function is intentionally
@@ -464,14 +349,12 @@ async def verify_pending_match(
         raise CategorySubmissionError(
             f"only PENDING matches can be verified; this one is {match.status}"
         )
-    if match.category is None:
-        raise CategorySubmissionError("match is missing a category — cannot route")
 
-    team_a_player_ids = [p.player_id for p in match.participants if p.team is Team.A]
-    team_b_player_ids = [p.player_id for p in match.participants if p.team is Team.B]
+    participants = list(match.participants)
+    team_a_player_ids = [p.player_id for p in participants if p.team is Team.A]
+    team_b_player_ids = [p.player_id for p in participants if p.team is Team.B]
 
     sub = CategoryMatchSubmission(
-        category=match.category,
         played_at=match.played_at,
         team_a_player_ids=team_a_player_ids,
         team_b_player_ids=team_b_player_ids,
@@ -482,30 +365,15 @@ async def verify_pending_match(
 
     rating_rows = {}
     for pid in team_a_player_ids + team_b_player_ids:
-        rating_rows[pid] = await _get_or_create_category_rating(
-            session, pid, match.category
-        )
+        rating_rows[pid] = await get_or_create_overall_rating(session, pid)
 
     pre_a = [_rating_from_row(rating_rows[pid]) for pid in team_a_player_ids]
     pre_b = [_rating_from_row(rating_rows[pid]) for pid in team_b_player_ids]
 
-    # Match-type weight: tournament matches use TOURNAMENT weight; ranked
-    # club matches use CLUB. Casual never reaches this verify path.
-    if match.tournament_id is not None:
-        sub = CategoryMatchSubmission(
-            **{**sub.__dict__}
-        )  # placeholder to make intent explicit
-        engine_match_type = MatchType.TOURNAMENT
-    else:
-        engine_match_type = MatchType.CLUB
-
+    engine_match_type = await _engine_weight_for(session, match)
     winner_team = Team.A if match.team_a_score > match.team_b_score else Team.B
 
-    # Reuse the doubles/singles routing in _compute_post_ratings but with
-    # the right engine weight — by patching MatchType selection via the
-    # sub.is_casual flag check inside that helper. To keep this minimal
-    # we inline the call here with explicit weight.
-    post_a, post_b = _compute_post_ratings_with_weight(
+    post_a, post_b = _compute_post_ratings(
         pre_a, pre_b, sub, winner_team, engine_match_type
     )
 
@@ -515,14 +383,12 @@ async def verify_pending_match(
     post_b = _clamp_each(post_b, ceil_b)
 
     # Rewrite the participants' audit rows with real deltas.
-    participants_by_pid = {p.player_id: p for p in match.participants}
-    for pid, pre, post in zip(team_a_player_ids, pre_a, post_a):
-        _apply_rating_to_row(rating_rows[pid], post)
-        mp = participants_by_pid[pid]
-        mp.pre_r, mp.pre_rd, mp.pre_sigma = pre.r, pre.rd, pre.sigma
-        mp.post_r, mp.post_rd, mp.post_sigma = post.r, post.rd, post.sigma
-        mp.delta_r = post.r - pre.r
-    for pid, pre, post in zip(team_b_player_ids, pre_b, post_b):
+    participants_by_pid = {p.player_id: p for p in participants}
+    for pid, pre, post in zip(
+        team_a_player_ids + team_b_player_ids,
+        pre_a + pre_b,
+        post_a + post_b,
+    ):
         _apply_rating_to_row(rating_rows[pid], post)
         mp = participants_by_pid[pid]
         mp.pre_r, mp.pre_rd, mp.pre_sigma = pre.r, pre.rd, pre.sigma
@@ -533,51 +399,3 @@ async def verify_pending_match(
     match.verified_at = datetime.now(timezone.utc)
     await session.flush()
     return match
-
-
-def _compute_post_ratings_with_weight(
-    pre_a: List[PlayerRating],
-    pre_b: List[PlayerRating],
-    sub: CategoryMatchSubmission,
-    winner_team: Team,
-    engine_match_type: MatchType,
-) -> Tuple[List[PlayerRating], List[PlayerRating]]:
-    """Variant of _compute_post_ratings that takes the engine weight explicitly."""
-    if not sub.is_doubles:
-        winner_pre, loser_pre = (
-            (pre_a[0], pre_b[0]) if winner_team is Team.A else (pre_b[0], pre_a[0])
-        )
-        winner_score, loser_score = (
-            (sub.team_a_score, sub.team_b_score)
-            if winner_team is Team.A
-            else (sub.team_b_score, sub.team_a_score)
-        )
-        winner_post, loser_post = process_match(
-            winner_pre, loser_pre, winner_score, loser_score,
-            engine_match_type, sub.played_at,
-        )
-        if winner_team is Team.A:
-            return [winner_post], [loser_post]
-        return [loser_post], [winner_post]
-
-    team_a_pre = _aggregate_team(pre_a)
-    team_b_pre = _aggregate_team(pre_b)
-    if winner_team is Team.A:
-        post_winner, post_loser = process_match(
-            team_a_pre, team_b_pre,
-            sub.team_a_score, sub.team_b_score,
-            engine_match_type, sub.played_at,
-        )
-        team_a_post, team_b_post = post_winner, post_loser
-    else:
-        post_winner, post_loser = process_match(
-            team_b_pre, team_a_pre,
-            sub.team_b_score, sub.team_a_score,
-            engine_match_type, sub.played_at,
-        )
-        team_a_post, team_b_post = post_loser, post_winner
-
-    return (
-        _apply_team_delta(pre_a, team_a_pre, team_a_post),
-        _apply_team_delta(pre_b, team_b_pre, team_b_post),
-    )

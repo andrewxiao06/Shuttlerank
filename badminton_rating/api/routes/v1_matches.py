@@ -107,7 +107,6 @@ async def create_v1_match(
     session: AsyncSession = Depends(get_db),
 ) -> CategoryMatchOut:
     sub = CategoryMatchSubmission(
-        category=payload.category,
         played_at=payload.played_at,
         team_a_player_ids=payload.team_a_player_ids,
         team_b_player_ids=payload.team_b_player_ids,
@@ -149,11 +148,17 @@ async def pending_inbox(
     player: Player = Depends(current_player),
     session: AsyncSession = Depends(get_db),
 ) -> List[CategoryMatchOut]:
-    # Matches where the current player is a participant and status is PENDING.
+    # Matches where the current player is a participant, status is PENDING,
+    # and they haven't already approved/disputed (submitters auto-approve,
+    # so their own submissions don't clutter the inbox).
     mp_subq = select(MatchPlayer.match_id).where(MatchPlayer.player_id == player.id)
+    acted_subq = select(MatchValidation.match_id).where(
+        MatchValidation.user_id == player.clerk_user_id
+    )
     stmt = (
         select(Match)
         .where(Match.id.in_(mp_subq))
+        .where(Match.id.not_in(acted_subq))
         .where(Match.status == MatchStatus.PENDING)
         .order_by(Match.created_at.desc())
     )
@@ -225,7 +230,16 @@ async def validate_match(
     else:
         all_approved = await _all_participants_approved(session, match)
         if all_approved:
-            await verify_pending_match(session, match)
+            # Re-load participants: the flush above may have expired the
+            # relationship, and async lazy-loads raise instead of loading.
+            await session.refresh(match, attribute_names=["participants"])
+            try:
+                await verify_pending_match(session, match)
+            except CategorySubmissionError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=str(e),
+                )
 
     await session.commit()
     await session.refresh(validation)

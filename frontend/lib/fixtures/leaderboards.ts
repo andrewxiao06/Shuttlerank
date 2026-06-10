@@ -1,13 +1,11 @@
-import type { Leaderboard, RatingCategory } from "../api/types";
+import type { Leaderboard } from "../api/types";
 import { ALL_PLAYERS } from "./players";
 
 /*
  * Mock leaderboard: derive entries from the players fixture so any new
- * player is automatically rankable. Real backend returns rank+entries per
- * category; this mirrors that.
+ * player is automatically rankable. One overall rating per player.
  */
 export function leaderboardFor(
-  category: RatingCategory,
   opts: { limit?: number; offset?: number; hideProvisional?: boolean } = {},
 ): Leaderboard {
   const limit = opts.limit ?? 50;
@@ -15,8 +13,7 @@ export function leaderboardFor(
 
   const entries = ALL_PLAYERS.flatMap((p) =>
     p.ratings
-      .filter((r) => r.category === category)
-      .filter((r) => r.match_count > 0) // skip players who never played this category
+      .filter((r) => r.match_count > 0) // skip players who never played
       .filter((r) => !opts.hideProvisional || !r.calibrating)
       .map((r) => ({ player: p, r })),
   )
@@ -34,7 +31,7 @@ export function leaderboardFor(
     }));
 
   return {
-    category,
+    category: "overall",
     total: entries.length,
     limit,
     offset,

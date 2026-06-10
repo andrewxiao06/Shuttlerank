@@ -5,10 +5,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { getMe, listPlayerMatches } from "@/lib/api";
-import {
-  CATEGORY_LABEL,
-  type CategoryRating,
-} from "@/lib/api/types";
+import { type CategoryRating } from "@/lib/api/types";
 import { TierChip } from "@/components/rating/TierChip";
 import { CalibrationDot } from "@/components/rating/CalibrationDot";
 import { MatchRow } from "@/components/match/MatchRow";
@@ -43,11 +40,10 @@ export function HomeView() {
   // useMemo must run on every render — keep it above any conditional
   // returns to satisfy React's rules-of-hooks. Sign-out flips
   // `meQ.data` to undefined so the memo cheaply returns null.
-  const hero: CategoryRating | null = useMemo(() => {
-    const played = (meQ.data?.ratings ?? []).filter((r) => r.match_count > 0);
-    if (played.length === 0) return meQ.data?.ratings[0] ?? null;
-    return played.reduce((a, b) => (b.display > a.display ? b : a));
-  }, [meQ.data]);
+  const hero: CategoryRating | null = useMemo(
+    () => meQ.data?.ratings[0] ?? null,
+    [meQ.data],
+  );
 
   if (!isLoaded) return <Skeleton />;
   if (!isSignedIn) return <SignedOutHero />;
@@ -84,7 +80,7 @@ export function HomeView() {
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <TierChip rating={hero.display} />
               <span className="text-caption text-text-muted">
-                {CATEGORY_LABEL[hero.category]} · {hero.match_count} match
+                {hero.match_count} match
                 {hero.match_count === 1 ? "" : "es"}
               </span>
             </div>
@@ -146,8 +142,8 @@ function SignedOutHero() {
       <p className="text-label uppercase text-primary">DUBR</p>
       <h1 className="mt-3 text-display-lg">Badminton, rated.</h1>
       <p className="mt-4 max-w-md text-body-md text-text-secondary">
-        Track your club ranking across six categories. Casual matches verify
-        instantly; ranked matches need both teams to approve.
+        One rating, every match. Play anyone, get your opponents to approve,
+        and climb the ladder — official tournaments count the most.
       </p>
       <div className="mt-8 flex gap-3">
         <SignUpButton mode="modal">

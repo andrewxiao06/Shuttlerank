@@ -13,16 +13,16 @@
  */
 
 import {
-  CATEGORY_LABEL,
   type CategoryMatch,
   type CategoryMatchCreate,
   type Forecast,
   type Leaderboard,
   type PlayerMe,
   type PlayerMePatch,
-  type RatingCategory,
   type ReportCreate,
   type Tournament,
+  type TournamentCreate,
+  type Validation,
   type ValidationCreate,
 } from "./types";
 import {
@@ -104,9 +104,8 @@ export async function getPlayer(id: number): Promise<PlayerMe> {
 
 export async function listPlayerMatches(
   playerId: number,
-  category?: RatingCategory,
 ): Promise<CategoryMatch[]> {
-  return delay(matchesForPlayer(playerId, category));
+  return delay(matchesForPlayer(playerId));
 }
 
 export async function getMatch(id: number): Promise<CategoryMatch> {
@@ -116,35 +115,32 @@ export async function getMatch(id: number): Promise<CategoryMatch> {
 }
 
 export async function createMatch(body: CategoryMatchCreate): Promise<CategoryMatch> {
-  const isCasual = body.category === "casual";
   const winner: "A" | "B" = body.team_a_score > body.team_b_score ? "A" : "B";
   const m: CategoryMatch = {
     id: store.nextMatchId++,
-    category: body.category,
-    status: isCasual ? "verified" : "pending",
+    category: "overall",
+    status: "pending",
     played_at: body.played_at,
     team_a_score: body.team_a_score,
     team_b_score: body.team_b_score,
     winner_team: winner,
     submitted_by_user_id: store.me.clerk_user_id,
-    verified_at: isCasual ? new Date().toISOString() : null,
-    expires_at: isCasual
-      ? null
-      : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    verified_at: null,
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     tournament_id: null,
     participants: [
       ...body.team_a_player_ids.map((pid) => ({
         player_id: pid,
         team: "A" as const,
-        pre_r: ratingFor(pid, body.category),
-        post_r: ratingFor(pid, body.category),
+        pre_r: ratingFor(pid),
+        post_r: ratingFor(pid),
         delta_r: 0,
       })),
       ...body.team_b_player_ids.map((pid) => ({
         player_id: pid,
         team: "B" as const,
-        pre_r: ratingFor(pid, body.category),
-        post_r: ratingFor(pid, body.category),
+        pre_r: ratingFor(pid),
+        post_r: ratingFor(pid),
         delta_r: 0,
       })),
     ],
@@ -153,9 +149,8 @@ export async function createMatch(body: CategoryMatchCreate): Promise<CategoryMa
   return delay(m);
 }
 
-function ratingFor(playerId: number, category: RatingCategory): number {
-  const r = findPlayer(playerId)?.ratings.find((x) => x.category === category);
-  return r?.display ?? 4.0;
+function ratingFor(playerId: number): number {
+  return findPlayer(playerId)?.ratings[0]?.display ?? 4.0;
 }
 
 export async function listPendingForMe(): Promise<CategoryMatch[]> {
@@ -169,7 +164,7 @@ export async function listPendingForMe(): Promise<CategoryMatch[]> {
 export async function validateMatch(
   matchId: number,
   body: ValidationCreate,
-): Promise<CategoryMatch> {
+): Promise<Validation> {
   const m = store.matches.find((x) => x.id === matchId);
   if (!m) throw new ApiError(404, `Match ${matchId} not found`);
   if (m.status !== "pending")
@@ -181,7 +176,13 @@ export async function validateMatch(
       : { ...m, status: "disputed" };
 
   store.matches = store.matches.map((x) => (x.id === matchId ? updated : x));
-  return delay(updated);
+  return delay({
+    id: Math.floor(Math.random() * 100000),
+    user_id: store.me.clerk_user_id ?? "user_demo",
+    action: body.action,
+    acted_at: new Date().toISOString(),
+    note: body.note ?? null,
+  });
 }
 
 export async function reportMatch(matchId: number, _body: ReportCreate): Promise<{ id: number }> {
@@ -195,10 +196,9 @@ export async function reportMatch(matchId: number, _body: ReportCreate): Promise
 // ---------------------------------------------------------------------------
 
 export async function getLeaderboard(
-  category: RatingCategory,
   opts: { limit?: number; offset?: number; hideProvisional?: boolean } = {},
 ): Promise<Leaderboard> {
-  return delay(leaderboardFor(category, opts));
+  return delay(leaderboardFor(opts));
 }
 
 // ---------------------------------------------------------------------------
@@ -208,31 +208,30 @@ export async function getLeaderboard(
 export async function getForecast(
   playerId: number,
   opponentId: number,
-  category: RatingCategory,
 ): Promise<Forecast> {
   const p = findPlayer(playerId);
   const o = findPlayer(opponentId);
   if (!p || !o) throw new ApiError(404, "Player not found");
 
-  const pr = p.ratings.find((r) => r.category === category);
-  const or = o.ratings.find((r) => r.category === category);
-  if (!pr || !or)
-    throw new ApiError(404, `One player has no rating in ${CATEGORY_LABEL[category]}`);
+  // Unrated players forecast from the 4.0 default — any two players work.
+  const pr = p.ratings[0];
+  const or = o.ratings[0];
+  const pDisplay = pr?.display ?? 4.0;
+  const oDisplay = or?.display ?? 4.0;
 
   // Logistic on display-rating diff. Real backend uses Glicko-2 E(); this is a
   // cosmetic stand-in for the mock layer that produces visually sensible numbers.
   const k = 1.1;
-  const win = 1 / (1 + Math.exp(-(pr.display - or.display) * k));
+  const win = 1 / (1 + Math.exp(-(pDisplay - oDisplay) * k));
 
   return delay({
     player_id: playerId,
     opponent_id: opponentId,
-    category,
-    player_display: pr.display,
-    opponent_display: or.display,
+    player_display: pDisplay,
+    opponent_display: oDisplay,
     win_probability: win,
-    player_calibrating: pr.calibrating,
-    opponent_calibrating: or.calibrating,
+    player_calibrating: pr?.calibrating ?? true,
+    opponent_calibrating: or?.calibrating ?? true,
   });
 }
 
@@ -242,6 +241,26 @@ export async function getForecast(
 
 export async function listTournaments(): Promise<Tournament[]> {
   return delay(store.tournaments);
+}
+
+export async function createTournament(
+  body: TournamentCreate,
+): Promise<Tournament> {
+  if (body.ranked && !store.me.is_admin)
+    throw new ApiError(403, "only administrators can host ranked tournaments");
+  const t: Tournament = {
+    id: Math.max(0, ...store.tournaments.map((x) => x.id)) + 1,
+    name: body.name,
+    format: body.format,
+    ranked: body.ranked,
+    starts_at: body.starts_at,
+    ends_at: body.ends_at ?? null,
+    status: "draft",
+    organizer_user_id: store.me.clerk_user_id,
+    entries: [],
+  };
+  store.tournaments = [...store.tournaments, t];
+  return delay(t);
 }
 
 export async function getTournament(id: number): Promise<Tournament> {
@@ -303,19 +322,14 @@ export async function completeTournament(id: number): Promise<Tournament> {
 // Player search (used by submit-match player picker)
 // ---------------------------------------------------------------------------
 
-export async function searchPlayers(
-  query: string,
-  opts: { eligibleGenders?: PlayerMe["gender"][] } = {},
-): Promise<PlayerMe[]> {
+export async function searchPlayers(query: string): Promise<PlayerMe[]> {
   const q = query.trim().toLowerCase();
-  const matches = ALL_PLAYERS.filter((p) => {
-    const inText = !q || p.name.toLowerCase().includes(q) || (p.display_name ?? "").toLowerCase().includes(q);
-    const eligible =
-      !opts.eligibleGenders ||
-      opts.eligibleGenders.length === 0 ||
-      (p.gender !== null && opts.eligibleGenders.includes(p.gender));
-    return inText && eligible;
-  });
+  const matches = ALL_PLAYERS.filter(
+    (p) =>
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      (p.display_name ?? "").toLowerCase().includes(q),
+  );
   return delay(matches.slice(0, 10));
 }
 
