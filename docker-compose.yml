@@ -1,0 +1,65 @@
+# Local dev stack: Postgres + Redis + FastAPI.
+#
+# Run:    docker compose up --build
+# Logs:   docker compose logs -f api
+# Reset:  docker compose down -v
+#
+# The api container mounts the project root so code edits hot-reload via
+# uvicorn's --reload. Postgres data persists in the `pgdata` volume across
+# restarts; `docker compose down -v` wipes it.
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: brs
+      POSTGRES_PASSWORD: brs
+      POSTGRES_DB: brs
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U brs -d brs"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: .
+    environment:
+      DATABASE_URL: postgresql+asyncpg://brs:brs@db:5432/brs
+      REDIS_URL: redis://redis:6379/0
+      UVICORN_EXTRA_ARGS: "--reload"
+      # DEV ONLY: trust the unverified X-Clerk-User-Id header so the local
+      # frontend can authenticate without a real Clerk JWT. In production
+      # this MUST be removed and CLERK_ISSUER set instead (see .env.example).
+      CLERK_DEV_ALLOW_HEADER: "1"
+    ports:
+      - "8000:8000"
+    volumes:
+      # Live-mount source for hot reload. The named volume on
+      # __pycache__ stops the container's bytecode from leaking back
+      # onto the host (which would otherwise confuse host-side tooling).
+      - .:/app
+      - pycache:/app/__pycache__
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  pycache:

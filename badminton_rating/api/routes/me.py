@@ -1,0 +1,95 @@
+"""
+Current-player routes: GET /players/me and PATCH /players/me.
+
+Identity comes from the Clerk session token (see api/auth.py). The
+category ratings sub-resource is hydrated lazily — we load every
+PlayerCategoryRating row for the player and project each through the
+engine's display-rating helpers.
+"""
+
+from __future__ import annotations
+
+from typing import List
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from badminton_rating.api.auth import current_player
+from badminton_rating.api.models.v1 import (
+    CategoryRatingOut,
+    PlayerMeOut,
+    PlayerMePatch,
+)
+from badminton_rating.db.models import Player, PlayerCategoryRating
+from badminton_rating.db.session import get_db
+from badminton_rating.engine.glicko import get_tier, to_display_rating
+
+
+router = APIRouter(prefix="/players", tags=["players"])
+
+
+async def _category_ratings(
+    session: AsyncSession, player_id: int
+) -> List[CategoryRatingOut]:
+    rows = (await session.execute(
+        select(PlayerCategoryRating).where(
+            PlayerCategoryRating.player_id == player_id
+        )
+    )).scalars().all()
+    out: List[CategoryRatingOut] = []
+    for row in rows:
+        display = to_display_rating(row.r)
+        out.append(CategoryRatingOut(
+            category=row.category,
+            r=row.r,
+            rd=row.rd,
+            display=display,
+            tier=get_tier(display),
+            calibrating=row.rd > 150.0,
+            ceiling=row.ceiling,
+            match_count=row.match_count,
+            last_active=row.last_active,
+        ))
+    return out
+
+
+@router.get("/me", response_model=PlayerMeOut)
+async def get_me(
+    player: Player = Depends(current_player),
+    session: AsyncSession = Depends(get_db),
+) -> PlayerMeOut:
+    return PlayerMeOut(
+        id=player.id,
+        clerk_user_id=player.clerk_user_id,
+        name=player.name,
+        display_name=player.display_name,
+        email=player.email,
+        gender=player.gender,
+        created_at=player.created_at,
+        ratings=await _category_ratings(session, player.id),
+    )
+
+
+@router.patch("/me", response_model=PlayerMeOut)
+async def patch_me(
+    payload: PlayerMePatch,
+    player: Player = Depends(current_player),
+    session: AsyncSession = Depends(get_db),
+) -> PlayerMeOut:
+    if payload.display_name is not None:
+        player.display_name = payload.display_name
+    if payload.gender is not None:
+        player.gender = payload.gender
+    await session.commit()
+    await session.refresh(player)
+    return PlayerMeOut(
+        id=player.id,
+        clerk_user_id=player.clerk_user_id,
+        name=player.name,
+        display_name=player.display_name,
+        email=player.email,
+        gender=player.gender,
+        created_at=player.created_at,
+        ratings=await _category_ratings(session, player.id),
+    )
