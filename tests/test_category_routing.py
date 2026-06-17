@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from badminton_rating.db.models import (
     Base,
+    DEFAULT_START_DISPLAY,
     INITIAL_CEILING,
     MatchStatus,
     MatchValidation,
@@ -44,8 +45,8 @@ from badminton_rating.services.categories import (
 )
 
 
-# Internal r value corresponding to the default ceiling — new players start here.
-START_R = from_display_rating(INITIAL_CEILING)
+# New players start at the beginner default (not the ceiling) and earn up.
+START_R = from_display_rating(DEFAULT_START_DISPLAY)
 
 
 async def _bump_ceiling(session, player_id, new_ceiling=8.0):

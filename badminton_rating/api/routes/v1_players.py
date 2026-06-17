@@ -21,11 +21,11 @@ from pydantic import BaseModel, Field
 from badminton_rating.api.auth import _resolve_clerk_user_id
 from badminton_rating.api.models.v1 import (
     CategoryMatchOut,
-    MatchParticipantOut,
     PlayerMeOut,
 )
 from badminton_rating.api.routes.admin import is_admin_user
 from badminton_rating.api.routes.me import _category_ratings
+from badminton_rating.api.routes.v1_matches import _participant_out
 from badminton_rating.db.models import (
     Match,
     MatchPlayer,
@@ -187,16 +187,7 @@ async def list_player_matches(
             verified_at=m.verified_at,
             expires_at=m.expires_at,
             tournament_id=m.tournament_id,
-            participants=[
-                MatchParticipantOut(
-                    player_id=p.player_id,
-                    team=p.team.value if hasattr(p.team, "value") else p.team,
-                    pre_r=p.pre_r,
-                    post_r=p.post_r,
-                    delta_r=p.delta_r,
-                )
-                for p in m.participants
-            ],
+            participants=[_participant_out(p) for p in m.participants],
         )
         for m in matches
     ]

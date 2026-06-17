@@ -12,11 +12,8 @@ import type { CategoryMatch } from "@/lib/api/types";
 
 /*
  * Rating history — derives a point per match from the viewer's
- * `post_r`. Only verified matches contribute; pending ones are noise.
- *
- * PLAN.md debug hook: "Chart shows wrong line → filter by category before
- * charting." That filtering happens in the calling page; this component
- * trusts what it's handed.
+ * display-scale rating (`post_display`). Only verified matches contribute;
+ * pending ones are noise. The internal Glicko number is never charted.
  */
 export function RatingHistoryChart({
   matches,
@@ -34,7 +31,7 @@ export function RatingHistoryChart({
       const me = m.participants.find((p) => p.player_id === viewerId);
       return {
         date: m.played_at,
-        rating: me?.post_r ?? null,
+        rating: me?.post_display ?? null,
       };
     })
     .filter((p): p is { date: string; rating: number } => p.rating != null);
@@ -70,7 +67,7 @@ export function RatingHistoryChart({
           <YAxis
             domain={[min - pad, max + pad]}
             tick={{ fontSize: 11, fill: "var(--dubr-text-muted)" }}
-            tickFormatter={(v: number) => v.toFixed(2)}
+            tickFormatter={(v: number) => v.toFixed(1)}
             tickLine={false}
             axisLine={false}
             width={42}
@@ -83,7 +80,7 @@ export function RatingHistoryChart({
               background: "var(--dubr-surface)",
             }}
             labelFormatter={(d) => new Date(String(d)).toDateString()}
-            formatter={(v) => [Number(v).toFixed(3), "Rating"]}
+            formatter={(v) => [Number(v).toFixed(1), "Rating"]}
           />
           <Line
             type="monotone"

@@ -253,13 +253,22 @@ class Player(Base):
 # PlayerCategoryRating — V1 child table that will replace singles_*/doubles_*
 # ---------------------------------------------------------------------------
 
-INITIAL_CEILING = 4.0  # DUPR-style starting cap; raised by tournament play.
+# Casual ceiling: the highest display rating reachable through normal
+# (non-tournament) play. Ranked tournaments + admin overrides raise it above
+# this; nobody climbs past 4.5 casually.
+INITIAL_CEILING = 4.5
 
-# New players start AT their ceiling — the cap is the max expressible rating,
-# so the natural starting point is the cap itself. They can drop below via
-# losses and climb back up to (but not above) the cap; tournaments unlock
-# higher caps. Computed once so the default doesn't drift from INITIAL_CEILING.
-_INITIAL_CATEGORY_R = from_display_rating(INITIAL_CEILING)
+# Self-pick: new players choose a starting level instead of being dropped at
+# the cap. They can pick 1.0–4.5; 5.0+ is gated behind ranked tournaments /
+# admin. Until they pick, they sit at the beginner default.
+SELF_PICK_MIN = 1.0
+SELF_PICK_MAX = 4.5
+DEFAULT_START_DISPLAY = 2.0
+
+# Auto-created rows (and unpicked players) start at the beginner default, not
+# the ceiling — players earn their way up. Computed once so the model default
+# doesn't drift from DEFAULT_START_DISPLAY.
+_INITIAL_CATEGORY_R = from_display_rating(DEFAULT_START_DISPLAY)
 
 
 class PlayerCategoryRating(Base):

@@ -42,6 +42,9 @@ function match(
         pre_r: pre[pid],
         post_r: pre[pid] + deltas[pid],
         delta_r: deltas[pid],
+        pre_display: pre[pid],
+        post_display: pre[pid] + deltas[pid],
+        delta_display: deltas[pid],
       })),
       ...b.map((pid) => ({
         player_id: pid,
@@ -49,6 +52,9 @@ function match(
         pre_r: pre[pid],
         post_r: pre[pid] + deltas[pid],
         delta_r: deltas[pid],
+        pre_display: pre[pid],
+        post_display: pre[pid] + deltas[pid],
+        delta_display: deltas[pid],
       })),
     ],
   };

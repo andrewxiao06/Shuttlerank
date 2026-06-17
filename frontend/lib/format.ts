@@ -1,18 +1,21 @@
 /*
- * Number + date formatting helpers. DESIGN.md "Don't" list locks the
- * display rating to 3 decimals — the 3rd decimal is the smallest
- * noticeable Glicko-2 delta on a single match.
+ * Number + date formatting helpers. Ratings show on the DUPR-style 2.0–8.0
+ * scale rounded to one decimal (e.g. "4.5"). The internal Glicko number is
+ * never surfaced to users — only these display values are.
  */
 
 export function formatRating(r: number | null | undefined): string {
   if (r == null || Number.isNaN(r)) return "—";
-  return r.toFixed(3);
+  return r.toFixed(1);
 }
 
 export function formatDelta(d: number | null | undefined): string {
   if (d == null || Number.isNaN(d)) return "—";
-  const sign = d > 0 ? "+" : d < 0 ? "−" : "±";
-  return `${sign}${Math.abs(d).toFixed(3)}`;
+  // Round to one decimal first so the sign matches the shown magnitude
+  // (a +0.04 change renders as "±0.0", not "+0.0").
+  const rounded = Math.round(d * 10) / 10;
+  const sign = rounded > 0 ? "+" : rounded < 0 ? "−" : "±";
+  return `${sign}${Math.abs(rounded).toFixed(1)}`;
 }
 
 export function formatPercent(p: number | null | undefined, digits = 0): string {

@@ -60,6 +60,9 @@ class PlayerMeOut(BaseModel):
 class PlayerMePatch(BaseModel):
     display_name: Optional[str] = Field(None, max_length=120)
     gender: Optional[PlayerGender] = None
+    # Self-selected starting level (display scale). Only honored before the
+    # player has any verified matches; capped at the casual ceiling (4.5).
+    starting_rating: Optional[float] = Field(None, ge=1.0, le=4.5)
 
 
 # ---------------------------------------------------------------------------
@@ -99,9 +102,14 @@ class MatchParticipantOut(BaseModel):
 
     player_id: int
     team: str
+    # Internal Glicko values stay in the payload for completeness, but the
+    # frontend renders only the *_display fields (2.0–8.0 scale).
     pre_r: float
     post_r: float
     delta_r: float
+    pre_display: float
+    post_display: float
+    delta_display: float
 
 
 class CategoryMatchOut(BaseModel):

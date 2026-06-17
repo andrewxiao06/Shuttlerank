@@ -89,6 +89,15 @@ export async function patchMe(patch: PlayerMePatch): Promise<PlayerMe> {
     store.me = { ...store.me, display_name: patch.display_name ?? null };
   if (patch.gender !== undefined)
     store.me = { ...store.me, gender: patch.gender ?? null };
+  if (patch.starting_rating != null) {
+    const current = store.me.ratings[0];
+    if (current && current.match_count === 0) {
+      store.me = {
+        ...store.me,
+        ratings: [{ ...current, display: patch.starting_rating, r: patch.starting_rating }],
+      };
+    }
+  }
   return delay(store.me);
 }
 
@@ -135,6 +144,9 @@ export async function createMatch(body: CategoryMatchCreate): Promise<CategoryMa
         pre_r: ratingFor(pid),
         post_r: ratingFor(pid),
         delta_r: 0,
+        pre_display: ratingFor(pid),
+        post_display: ratingFor(pid),
+        delta_display: 0,
       })),
       ...body.team_b_player_ids.map((pid) => ({
         player_id: pid,
@@ -142,6 +154,9 @@ export async function createMatch(body: CategoryMatchCreate): Promise<CategoryMa
         pre_r: ratingFor(pid),
         post_r: ratingFor(pid),
         delta_r: 0,
+        pre_display: ratingFor(pid),
+        post_display: ratingFor(pid),
+        delta_display: 0,
       })),
     ],
   };
