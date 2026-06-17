@@ -143,6 +143,8 @@ export type PlayerMe = z.infer<typeof PlayerMeSchema>;
 export const PlayerMePatchSchema = z.object({
   display_name: z.string().max(120).nullable().optional(),
   gender: PlayerGenderSchema.nullable().optional(),
+  // Self-selected starting level (1.0–4.5). Only honored before first match.
+  starting_rating: z.number().min(1).max(4.5).optional(),
 });
 export type PlayerMePatch = z.infer<typeof PlayerMePatchSchema>;
 
@@ -183,6 +185,10 @@ export const MatchParticipantSchema = z.object({
   pre_r: z.number(),
   post_r: z.number(),
   delta_r: z.number(),
+  // Display-scale (2.0–8.0) values — the only ones shown to users.
+  pre_display: z.number(),
+  post_display: z.number(),
+  delta_display: z.number(),
 });
 export type MatchParticipant = z.infer<typeof MatchParticipantSchema>;
 

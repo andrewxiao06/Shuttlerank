@@ -27,6 +27,26 @@ const GENDER_OPTIONS: { value: PlayerGender; label: string }[] = [
   { value: "X", label: "Prefer not to say" },
 ];
 
+/*
+ * Starting-level guide. Players self-rate 1.0–4.5; their pick is a starting
+ * point with high uncertainty, so results correct it quickly. 5.0+ is
+ * locked — it's earned through ranked tournaments or set by an admin.
+ */
+const LEVEL_OPTIONS: { value: number; label: string; hint: string }[] = [
+  { value: 1.0, label: "1.0 — Beginner", hint: "Just learning how to rally" },
+  { value: 2.0, label: "2.0 — Amateur", hint: "Can play, but no advanced techniques yet" },
+  { value: 3.0, label: "3.0 — Recreational", hint: "Can play somewhat competitive games" },
+  { value: 3.5, label: "3.5 — Semi-advanced", hint: "Can hang with most except very advanced players" },
+  { value: 4.0, label: "4.0 — Advanced", hint: "Plays genuinely competitive games" },
+  { value: 4.5, label: "4.5 — Near-competitive", hint: "Almost competes with real competitors (casual cap)" },
+];
+
+const LOCKED_LEVELS: { label: string; hint: string }[] = [
+  { label: "5.0 — Semi-pro", hint: "Coaches, retired athletes, former serious competitors" },
+  { label: "6.0 — Pro", hint: "They compete, and they're genuinely good" },
+  { label: "6.0+ — Elite", hint: "A league of its own, up to 8.0 (e.g. Viktor Axelsen)" },
+];
+
 export function MeSettingsView() {
   const { isLoaded, isSignedIn } = useAuth();
   const router = useRouter();
@@ -42,6 +62,7 @@ export function MeSettingsView() {
 
   const [displayName, setDisplayName] = useState("");
   const [gender, setGender] = useState<PlayerGender | "">("");
+  const [level, setLevel] = useState<number | null>(null);
 
   // Hydrate the form once the player loads. Empty form fields stay empty
   // intentionally — we don't want to overwrite a user's in-progress edit.
@@ -49,14 +70,20 @@ export function MeSettingsView() {
     if (meQ.data) {
       setDisplayName(meQ.data.display_name ?? meQ.data.name ?? "");
       setGender((meQ.data.gender as PlayerGender | null) ?? "");
+      setLevel(meQ.data.ratings[0]?.display ?? null);
     }
   }, [meQ.data]);
+
+  // Self-pick is only allowed before the first rated match.
+  const rating = meQ.data?.ratings[0];
+  const canPickLevel = (rating?.match_count ?? 0) === 0;
 
   const save = useMutation({
     mutationFn: () =>
       patchMe({
         display_name: displayName.trim() || null,
         gender: gender ? PlayerGenderSchema.parse(gender) : null,
+        starting_rating: canPickLevel && level != null ? level : undefined,
       }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: ["me"] });
@@ -141,6 +168,69 @@ export function MeSettingsView() {
               </label>
             ))}
           </div>
+        </fieldset>
+
+        <fieldset>
+          <legend className="text-label uppercase text-text-secondary">
+            Starting level
+          </legend>
+          {canPickLevel ? (
+            <>
+              <p className="mt-1 text-caption text-text-muted">
+                Rate yourself honestly — it&apos;s just a starting point, and
+                your results will adjust it quickly. You can&apos;t change this
+                once you&apos;ve played a match.
+              </p>
+              <div className="mt-3 space-y-2">
+                {LEVEL_OPTIONS.map((opt) => (
+                  <label
+                    key={opt.value}
+                    className={cn(
+                      "flex cursor-pointer items-start gap-3 rounded-md border p-3",
+                      level === opt.value
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:bg-surface-muted",
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="level"
+                      checked={level === opt.value}
+                      onChange={() => setLevel(opt.value)}
+                      className="mt-1 h-4 w-4 accent-primary"
+                    />
+                    <div>
+                      <p className="text-body-md">{opt.label}</p>
+                      <p className="text-caption text-text-muted">{opt.hint}</p>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="mt-4 text-label uppercase text-text-secondary">
+                Earned only through tournaments
+              </p>
+              <div className="mt-2 space-y-2 opacity-60">
+                {LOCKED_LEVELS.map((opt) => (
+                  <div
+                    key={opt.label}
+                    className="flex items-start gap-3 rounded-md border border-dashed border-border p-3"
+                  >
+                    <span aria-hidden className="mt-0.5 text-text-muted">🔒</span>
+                    <div>
+                      <p className="text-body-md">{opt.label}</p>
+                      <p className="text-caption text-text-muted">{opt.hint}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          ) : (
+            <p className="mt-1 text-caption text-text-muted">
+              Your level is now set by your match results
+              {rating ? ` (currently ${rating.display.toFixed(1)})` : ""}. Play
+              ranked tournaments to climb above the 4.5 casual cap.
+            </p>
+          )}
         </fieldset>
 
         {save.isError ? (

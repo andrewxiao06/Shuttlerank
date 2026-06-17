@@ -36,6 +36,7 @@ from badminton_rating.db.models import (
     ValidationAction,
 )
 from badminton_rating.db.session import get_db
+from badminton_rating.engine.glicko import to_display_rating
 from badminton_rating.services.categories import (
     CategoryMatchSubmission,
     CategorySubmissionError,
@@ -64,16 +65,22 @@ def _match_to_out(match: Match) -> CategoryMatchOut:
         verified_at=match.verified_at,
         expires_at=match.expires_at,
         tournament_id=match.tournament_id,
-        participants=[
-            MatchParticipantOut(
-                player_id=p.player_id,
-                team=p.team.value,
-                pre_r=p.pre_r,
-                post_r=p.post_r,
-                delta_r=p.delta_r,
-            )
-            for p in match.participants
-        ],
+        participants=[_participant_out(p) for p in match.participants],
+    )
+
+
+def _participant_out(p: MatchPlayer) -> MatchParticipantOut:
+    pre_display = to_display_rating(p.pre_r)
+    post_display = to_display_rating(p.post_r)
+    return MatchParticipantOut(
+        player_id=p.player_id,
+        team=p.team.value,
+        pre_r=p.pre_r,
+        post_r=p.post_r,
+        delta_r=p.delta_r,
+        pre_display=pre_display,
+        post_display=post_display,
+        delta_display=round(post_display - pre_display, 3),
     )
 
 

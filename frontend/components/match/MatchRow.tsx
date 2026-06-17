@@ -33,7 +33,7 @@ export function MatchRow({
   const opp = match.participants.find(
     (p) => p.team !== (viewer?.team ?? "A") && p.player_id !== viewerId,
   );
-  const oppRating = opp?.post_r;
+  const oppRating = opp?.post_display;
   const youWon = viewer?.team === match.winner_team;
 
   const ago = relativeTime(match.played_at);
@@ -67,7 +67,7 @@ export function MatchRow({
           </div>
           <p className="text-caption text-text-secondary">
             {match.participants.length > 2 ? "Doubles" : "Singles"} · {ago}
-            {oppRating != null ? ` · vs ${oppRating.toFixed(2)}` : ""}
+            {oppRating != null ? ` · vs ${oppRating.toFixed(1)}` : ""}
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">

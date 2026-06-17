@@ -176,7 +176,7 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
                 {formatPrePost(p)}
               </span>
               {match.status === "verified" ? (
-                <DeltaPill delta={p.delta_r} />
+                <DeltaPill delta={p.delta_display} />
               ) : (
                 <span className="text-caption text-text-muted">—</span>
               )}
@@ -250,8 +250,10 @@ function Side({
 }
 
 function formatPrePost(p: MatchParticipant): string {
-  if (p.pre_r === p.post_r) return formatRating(p.pre_r);
-  return `${formatRating(p.pre_r)} → ${formatRating(p.post_r)}`;
+  // Show the display-scale (2.0–8.0) ratings, never the internal Glicko r.
+  if (formatRating(p.pre_display) === formatRating(p.post_display))
+    return formatRating(p.pre_display);
+  return `${formatRating(p.pre_display)} → ${formatRating(p.post_display)}`;
 }
 
 function Skeleton() {
