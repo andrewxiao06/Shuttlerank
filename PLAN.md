@@ -48,7 +48,7 @@ with the web app as a secondary surface.
    - Verify real data end-to-end (the account-switch cache fix `a0ecf15` only
      shows its effect once off mocks).
 
-**3. Mobile app — Expo / React Native** ⬜ **(priority)**
+**3. Mobile app — Expo / React Native** ⬜ **(priority)** — *full build plan in `MOBILE.md`*
    - **Reuses the FastAPI backend 100%** — it's a REST API; the deploy work
      above is the shared foundation. Also reuses TS types, Zod schemas, and
      the API-client/business logic; the **UI is rebuilt** in React Native
