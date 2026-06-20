@@ -1,11 +1,31 @@
-import { Tabs } from "expo-router";
+import { useAuth } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
+import { Redirect, Tabs } from "expo-router";
+import { ActivityIndicator, View } from "react-native";
 import { colors } from "../../../lib/theme";
 
 // Bottom tab navigator — mirrors the web app's MobileTabBar:
-// Home / Leaderboard / Submit / Inbox / Profile. Each `name` matches a
-// file in this (tabs) folder.
+// Home / Leaderboard / Submit / Inbox / Profile. Gated: signed-out users
+// are redirected to the sign-in screen.
 export default function TabsLayout() {
+  const { isLoaded, isSignedIn } = useAuth();
+
+  if (!isLoaded) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: colors.bg,
+        }}
+      >
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+  if (!isSignedIn) return <Redirect href="/sign-in" />;
+
   return (
     <Tabs
       screenOptions={{
