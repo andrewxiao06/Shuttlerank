@@ -156,7 +156,13 @@ async def _verify_clerk_jwt(token: str) -> str:
         )
 
     allowed = _authorized_parties()
-    if allowed and claims.get("azp") not in allowed:
+    # `azp` is the authorized party — a browser *origin*. Native clients
+    # (the Expo mobile app) legitimately have no azp claim, so only enforce
+    # the allow-list when the claim is actually present. A web token whose
+    # azp is set-but-not-listed is still rejected; a native token with no
+    # azp passes.
+    azp = claims.get("azp")
+    if allowed and azp is not None and azp not in allowed:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="token authorized party (azp) not allowed",

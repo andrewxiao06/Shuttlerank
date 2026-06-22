@@ -249,3 +249,9 @@ async def test_authorized_party_enforced(keypair, app_factory, client, monkeypat
     good = _make_token(private_pem, sub="clerk_real", azp="https://app.dubr.com")
     r = await client.get("/players/me", headers={"Authorization": f"Bearer {good}"})
     assert r.status_code == 200
+
+    # No azp claim (native mobile token) -> accepted even with an allowlist set.
+    # azp identifies a browser origin; native clients legitimately omit it.
+    native = _make_token(private_pem, sub="clerk_real")
+    r = await client.get("/players/me", headers={"Authorization": f"Bearer {native}"})
+    assert r.status_code == 200
