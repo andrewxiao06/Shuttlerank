@@ -2,6 +2,7 @@ import { ClerkProvider } from "@clerk/clerk-expo";
 import { tokenCache } from "@clerk/clerk-expo/token-cache";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryProvider } from "../../lib/query";
 import { AuthSync } from "../../lib/auth-sync";
 
@@ -14,12 +15,14 @@ export default function RootLayout() {
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <QueryProvider>
-        <AuthSync />
-        <StatusBar style="dark" />
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="sign-in" />
-        </Stack>
+        <SafeAreaProvider>
+          <AuthSync />
+          <StatusBar style="dark" />
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="sign-in" />
+          </Stack>
+        </SafeAreaProvider>
       </QueryProvider>
     </ClerkProvider>
   );

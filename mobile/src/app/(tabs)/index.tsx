@@ -1,5 +1,6 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { Pressable, SafeAreaView, Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, radius, spacing } from "../../../lib/theme";
 
 // Home / dashboard. Minimal for now — shows who's signed in and a sign-out

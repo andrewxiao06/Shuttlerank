@@ -1,4 +1,5 @@
-import { SafeAreaView, Text, View } from "react-native";
+import { Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { colors, spacing } from "../lib/theme";
 
 // Temporary screen scaffold used until each real screen lands. Keeps the
