@@ -7,23 +7,24 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { searchPlayers } from "../lib/api/client";
 import type { PlayerMe } from "../lib/api/types";
 import { colors, radius, spacing } from "../lib/theme";
 
 /*
- * Debounced player search. Type a name → results appear → tap one to pick it.
- * `excludeIds` hides players already chosen (e.g. on the other team).
+ * Searchable player dropdown. Tap the field to open: it shows the top
+ * players right away (browse), and you type to filter the list down. Tap a
+ * result to pick it. `excludeIds` hides players already chosen.
  *
- * New RN bits:
- *  - TextInput is the editable text field (RN's <input>).
- *  - We debounce with a setTimeout so we don't fire a request on every
- *    keystroke — only ~250ms after the user stops typing.
+ * "Open on focus with an empty query" is what makes it feel like a dropdown
+ * rather than a plain search box — searchPlayers("") returns the first
+ * players, so there's always something to pick from.
  */
 export function PlayerSearch({
   onPick,
   excludeIds = [],
-  placeholder = "Search players…",
+  placeholder = "Tap to choose a player…",
 }: {
   onPick: (player: PlayerMe) => void;
   excludeIds?: number[];
@@ -31,40 +32,72 @@ export function PlayerSearch({
 }) {
   const [query, setQuery] = useState("");
   const [debounced, setDebounced] = useState("");
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 250);
     return () => clearTimeout(t);
   }, [query]);
 
+  // Enabled whenever the dropdown is open — even with an empty query, so the
+  // user can browse before typing.
   const q = useQuery({
     queryKey: ["search-players", debounced],
     queryFn: () => searchPlayers(debounced),
-    enabled: debounced.length > 0,
+    enabled: open,
   });
 
   const results = (q.data ?? []).filter((p) => !excludeIds.includes(p.id));
 
   return (
     <View>
-      <TextInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
-        autoCapitalize="none"
+      {/* The field */}
+      <View
         style={{
-          height: 44,
+          flexDirection: "row",
+          alignItems: "center",
           borderWidth: 1,
-          borderColor: colors.border,
+          borderColor: open ? colors.primary : colors.border,
           borderRadius: radius.md,
-          paddingHorizontal: spacing.md,
           backgroundColor: colors.surface,
-          color: colors.text,
+          paddingHorizontal: spacing.md,
         }}
-      />
+      >
+        <Ionicons name="search" size={18} color={colors.textMuted} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          onFocus={() => setOpen(true)}
+          placeholder={placeholder}
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          style={{
+            flex: 1,
+            height: 44,
+            paddingHorizontal: spacing.sm,
+            color: colors.text,
+          }}
+        />
+        <Pressable
+          onPress={() => {
+            if (open) {
+              setQuery("");
+              setOpen(false);
+            } else {
+              setOpen(true);
+            }
+          }}
+        >
+          <Ionicons
+            name={open ? "chevron-up" : "chevron-down"}
+            size={18}
+            color={colors.textMuted}
+          />
+        </Pressable>
+      </View>
 
-      {debounced.length > 0 ? (
+      {/* The dropdown panel */}
+      {open ? (
         <View
           style={{
             marginTop: spacing.xs,
@@ -81,7 +114,7 @@ export function PlayerSearch({
             </View>
           ) : results.length === 0 ? (
             <Text style={{ padding: spacing.md, color: colors.textMuted }}>
-              No players found.
+              {debounced ? "No players match." : "No players found."}
             </Text>
           ) : (
             results.map((p) => (
@@ -90,7 +123,7 @@ export function PlayerSearch({
                 onPress={() => {
                   onPick(p);
                   setQuery("");
-                  setDebounced("");
+                  setOpen(false);
                 }}
                 style={{
                   padding: spacing.md,

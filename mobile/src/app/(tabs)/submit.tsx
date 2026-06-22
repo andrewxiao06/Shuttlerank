@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Pressable, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { PlayerSearch } from "../../../components/PlayerSearch";
+import { Button } from "../../../components/ui/Button";
+import { Screen } from "../../../components/ui/Screen";
 import { createMatch } from "../../../lib/api/client";
 import type { PlayerMe } from "../../../lib/api/types";
 import { colors, radius, spacing } from "../../../lib/theme";
@@ -74,13 +75,12 @@ export default function Submit() {
   // --- Success state ---
   if (submit.isSuccess) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Screen>
         <View
           style={{
             flex: 1,
             alignItems: "center",
             justifyContent: "center",
-            padding: spacing.xl,
             gap: spacing.md,
           }}
         >
@@ -91,37 +91,25 @@ export default function Submit() {
           <Text style={{ color: colors.textSecondary, textAlign: "center" }}>
             It&apos;s pending until the other players approve it in their inbox.
           </Text>
-          <Pressable
-            onPress={() => {
-              reset();
-              submit.reset();
-            }}
-            style={{
-              marginTop: spacing.md,
-              backgroundColor: colors.primary,
-              paddingVertical: spacing.md,
-              paddingHorizontal: spacing.xl,
-              borderRadius: radius.md,
-            }}
-          >
-            <Text style={{ color: colors.onPrimary, fontWeight: "600" }}>
-              Submit another
-            </Text>
-          </Pressable>
+          <View style={{ marginTop: spacing.md, alignSelf: "stretch" }}>
+            <Button
+              label="Submit another"
+              onPress={() => {
+                reset();
+                submit.reset();
+              }}
+            />
+          </View>
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.xl }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>
-          Submit a match
-        </Text>
+    <Screen scroll>
+      <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>
+        Submit a match
+      </Text>
 
         {/* Format toggle */}
         <View style={{ gap: spacing.sm }}>
@@ -192,26 +180,14 @@ export default function Submit() {
           </Text>
         ) : null}
 
-        {/* Submit */}
-        <Pressable
-          disabled={!ready || submit.isPending}
-          onPress={() => submit.mutate()}
-          style={{
-            backgroundColor: colors.primary,
-            paddingVertical: spacing.lg,
-            borderRadius: radius.md,
-            alignItems: "center",
-            opacity: !ready || submit.isPending ? 0.4 : 1,
-          }}
-        >
-          <Text
-            style={{ color: colors.onPrimary, fontSize: 16, fontWeight: "700" }}
-          >
-            {submit.isPending ? "Submitting…" : "Submit match"}
-          </Text>
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
+      {/* Submit */}
+      <Button
+        label={submit.isPending ? "Submitting…" : "Submit match"}
+        onPress={() => submit.mutate()}
+        disabled={!ready}
+        loading={submit.isPending}
+      />
+    </Screen>
   );
 }
 
