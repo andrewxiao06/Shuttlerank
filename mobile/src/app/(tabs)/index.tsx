@@ -1,47 +1,194 @@
-import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useAuth } from "@clerk/clerk-expo";
+import { useQuery } from "@tanstack/react-query";
+import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { Card } from "../../../components/ui/Card";
+import { Screen } from "../../../components/ui/Screen";
+import { AsyncBoundary } from "../../../components/ui/AsyncBoundary";
+import { getMe, listPlayerMatches } from "../../../lib/api/client";
+import { formatRating, tierLabel, isCalibrating } from "../../../lib/format";
+import type { CategoryMatch, PlayerMe } from "../../../lib/api/types";
 import { colors, radius, spacing } from "../../../lib/theme";
 
-// Home / dashboard. Minimal for now — shows who's signed in and a sign-out
-// button so the auth loop is testable. Full dashboard lands in Phase 3.
+/*
+ * Home dashboard — your rating hero, quick actions, and recent matches.
+ * Mirrors the web home view, built on the shared primitives.
+ */
 export default function Home() {
   const { signOut } = useAuth();
-  const { user } = useUser();
+  const router = useRouter();
+
+  const meQ = useQuery({ queryKey: ["me"], queryFn: getMe });
+  const playerId = meQ.data?.id;
+
+  const matchesQ = useQuery({
+    queryKey: ["matches", playerId],
+    queryFn: () => listPlayerMatches(playerId!),
+    enabled: playerId != null,
+  });
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          gap: spacing.md,
-          padding: spacing.xl,
-        }}
+    <Screen scroll>
+      <AsyncBoundary
+        isPending={meQ.isPending}
+        isError={meQ.isError}
+        error={meQ.error}
+        errorPrefix="Couldn't load your profile."
       >
-        <Text style={{ fontSize: 26, fontWeight: "700", color: colors.text }}>
-          Hello DUBR 🏸
+        {meQ.data ? (
+          <HomeBody
+            me={meQ.data}
+            matches={matchesQ.data ?? []}
+            onSubmit={() => router.push("/submit")}
+            onLeaderboard={() => router.push("/leaderboard")}
+            onForecast={() => router.push("/forecast")}
+            onSignOut={() => signOut()}
+          />
+        ) : null}
+      </AsyncBoundary>
+    </Screen>
+  );
+}
+
+function HomeBody({
+  me,
+  matches,
+  onSubmit,
+  onLeaderboard,
+  onForecast,
+  onSignOut,
+}: {
+  me: PlayerMe;
+  matches: CategoryMatch[];
+  onSubmit: () => void;
+  onLeaderboard: () => void;
+  onForecast: () => void;
+  onSignOut: () => void;
+}) {
+  const rating = me.ratings[0];
+  const recent = [...matches]
+    .sort((a, b) => b.played_at.localeCompare(a.played_at))
+    .slice(0, 3);
+
+  return (
+    <>
+      {/* Hero */}
+      <Card style={{ gap: spacing.sm }}>
+        <Text style={{ color: colors.textSecondary, fontSize: 13, textTransform: "uppercase" }}>
+          {me.display_name ?? me.name}
         </Text>
-        <Text style={{ color: colors.textSecondary, textAlign: "center" }}>
-          Signed in as{" "}
-          {user?.primaryEmailAddress?.emailAddress ?? user?.firstName ?? "you"}.
-          {"\n"}Dashboard, screens & more land in Phase 3.
+        <Text style={{ fontSize: 48, fontWeight: "800", color: colors.text }}>
+          {rating && rating.match_count > 0 ? formatRating(rating.display) : "—"}
         </Text>
-        <Pressable
-          onPress={() => signOut()}
+        {rating ? (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+            <Text style={{ color: colors.accent, fontWeight: "600" }}>
+              {tierLabel(rating.display)}
+            </Text>
+            <Text style={{ color: colors.textMuted }}>
+              · {rating.match_count} match{rating.match_count === 1 ? "" : "es"}
+            </Text>
+          </View>
+        ) : null}
+        {rating && isCalibrating(rating.rd) ? (
+          <Text style={{ color: colors.warning }}>
+            Still calibrating — play a few matches.
+          </Text>
+        ) : null}
+      </Card>
+
+      {/* Quick actions */}
+      <View style={{ flexDirection: "row", gap: spacing.md }}>
+        <QuickAction icon="add-circle-outline" label="Submit" onPress={onSubmit} />
+        <QuickAction icon="podium-outline" label="Board" onPress={onLeaderboard} />
+        <QuickAction icon="stats-chart-outline" label="Forecast" onPress={onForecast} />
+      </View>
+
+      {/* Recent matches */}
+      <View style={{ gap: spacing.sm }}>
+        <Text style={{ fontSize: 18, fontWeight: "700", color: colors.text }}>
+          Recent matches
+        </Text>
+        {recent.length === 0 ? (
+          <Text style={{ color: colors.textMuted }}>
+            No matches yet — submit your first one.
+          </Text>
+        ) : (
+          recent.map((m) => (
+            <MatchRow key={m.id} match={m} viewerId={me.id} />
+          ))
+        )}
+      </View>
+
+      {/* Sign out */}
+      <Pressable onPress={onSignOut} style={{ alignItems: "center", paddingVertical: spacing.md }}>
+        <Text style={{ color: colors.textMuted }}>Sign out</Text>
+      </Pressable>
+    </>
+  );
+}
+
+function QuickAction({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{
+        flex: 1,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
+        borderRadius: radius.md,
+        paddingVertical: spacing.lg,
+        alignItems: "center",
+        gap: spacing.xs,
+      }}
+    >
+      <Ionicons name={icon} size={24} color={colors.primary} />
+      <Text style={{ color: colors.text, fontWeight: "600" }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function MatchRow({ match, viewerId }: { match: CategoryMatch; viewerId: number }) {
+  const me = match.participants.find((p) => p.player_id === viewerId);
+  const youWon = me?.team === match.winner_team;
+  const verified = match.status === "verified";
+  const delta = me?.delta_display ?? 0;
+
+  return (
+    <Card style={{ flexDirection: "row", alignItems: "center", padding: spacing.md }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ color: colors.text, fontWeight: "600" }}>
+          {match.participants.length > 2 ? "Doubles" : "Singles"} · {match.played_at}
+        </Text>
+        <Text style={{ color: verified ? (youWon ? colors.accent : colors.danger) : colors.warning, fontSize: 12 }}>
+          {verified ? (youWon ? "Won" : "Lost") : "Pending"}
+        </Text>
+      </View>
+      <Text style={{ color: colors.text, fontWeight: "700" }}>
+        {match.team_a_score}–{match.team_b_score}
+      </Text>
+      {verified ? (
+        <Text
           style={{
-            marginTop: spacing.lg,
-            borderWidth: 1,
-            borderColor: colors.border,
-            paddingVertical: spacing.sm,
-            paddingHorizontal: spacing.lg,
-            borderRadius: radius.md,
+            marginLeft: spacing.md,
+            color: delta > 0 ? colors.accent : delta < 0 ? colors.danger : colors.textMuted,
+            fontWeight: "700",
           }}
         >
-          <Text style={{ color: colors.text }}>Sign out</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
+          {delta > 0 ? "+" : delta < 0 ? "−" : "±"}
+          {Math.abs(delta).toFixed(1)}
+        </Text>
+      ) : null}
+    </Card>
   );
 }

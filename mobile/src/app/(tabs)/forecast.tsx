@@ -1,0 +1,154 @@
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { Pressable, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { PlayerSearch } from "../../../components/PlayerSearch";
+import { Card } from "../../../components/ui/Card";
+import { Screen } from "../../../components/ui/Screen";
+import { getForecast } from "../../../lib/api/client";
+import { formatPercent, formatRating, tierLabel } from "../../../lib/format";
+import type { PlayerMe } from "../../../lib/api/types";
+import { colors, radius, spacing } from "../../../lib/theme";
+
+/*
+ * Forecast — pick two players, see the win probability. Any two players can
+ * be compared (one universal rating). The big % uses the "info" blue, the
+ * locked semantic for a forecast (not a win/positive color).
+ */
+export default function Forecast() {
+  const [you, setYou] = useState<PlayerMe | null>(null);
+  const [opp, setOpp] = useState<PlayerMe | null>(null);
+
+  const ready = you != null && opp != null && you.id !== opp.id;
+  const q = useQuery({
+    queryKey: ["forecast", you?.id, opp?.id],
+    queryFn: () => getForecast(you!.id, opp!.id),
+    enabled: ready,
+  });
+
+  return (
+    <Screen scroll>
+      <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>
+        Who wins?
+      </Text>
+
+      {/* Pickers */}
+      <View style={{ gap: spacing.md }}>
+        <PlayerSlot
+          label="You"
+          player={you}
+          onPick={setYou}
+          onClear={() => setYou(null)}
+          excludeIds={opp ? [opp.id] : []}
+        />
+        <PlayerSlot
+          label="Opponent"
+          player={opp}
+          onPick={setOpp}
+          onClear={() => setOpp(null)}
+          excludeIds={you ? [you.id] : []}
+        />
+      </View>
+
+      {/* Result */}
+      {!ready ? (
+        <Text style={{ color: colors.textMuted, textAlign: "center" }}>
+          Pick two players to see the forecast.
+        </Text>
+      ) : q.isPending ? (
+        <Card>
+          <Text style={{ color: colors.textMuted, textAlign: "center" }}>
+            Calculating…
+          </Text>
+        </Card>
+      ) : q.isError ? (
+        <Card>
+          <Text style={{ color: colors.danger, textAlign: "center" }}>
+            {(q.error as Error).message}
+          </Text>
+        </Card>
+      ) : (
+        <>
+          <Card style={{ alignItems: "center", gap: spacing.xs }}>
+            <Text style={{ color: colors.textSecondary, fontSize: 13, textTransform: "uppercase" }}>
+              {you!.display_name ?? you!.name} wins
+            </Text>
+            <Text style={{ fontSize: 56, fontWeight: "800", color: colors.info }}>
+              {formatPercent(q.data.win_probability)}
+            </Text>
+            {q.data.player_calibrating || q.data.opponent_calibrating ? (
+              <Text style={{ color: colors.warning, textAlign: "center" }}>
+                One or both players are still calibrating — treat this as a rough guess.
+              </Text>
+            ) : null}
+          </Card>
+
+          <View style={{ flexDirection: "row", gap: spacing.md }}>
+            <RatingMini label={you!.display_name ?? you!.name} display={q.data.player_display} />
+            <RatingMini label={opp!.display_name ?? opp!.name} display={q.data.opponent_display} />
+          </View>
+        </>
+      )}
+    </Screen>
+  );
+}
+
+function PlayerSlot({
+  label,
+  player,
+  onPick,
+  onClear,
+  excludeIds,
+}: {
+  label: string;
+  player: PlayerMe | null;
+  onPick: (p: PlayerMe) => void;
+  onClear: () => void;
+  excludeIds: number[];
+}) {
+  return (
+    <View style={{ gap: spacing.xs }}>
+      <Text style={{ color: colors.textSecondary, fontSize: 13, textTransform: "uppercase" }}>
+        {label}
+      </Text>
+      {player ? (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: colors.surfaceMuted,
+            borderRadius: radius.md,
+            paddingVertical: spacing.md,
+            paddingHorizontal: spacing.md,
+          }}
+        >
+          <Text style={{ color: colors.text, fontSize: 16 }}>
+            {player.display_name ?? player.name}
+          </Text>
+          <Pressable onPress={onClear}>
+            <Ionicons name="close-circle" size={22} color={colors.textMuted} />
+          </Pressable>
+        </View>
+      ) : (
+        <PlayerSearch onPick={onPick} excludeIds={excludeIds} />
+      )}
+    </View>
+  );
+}
+
+function RatingMini({ label, display }: { label: string; display: number }) {
+  return (
+    <Card style={{ flex: 1, gap: spacing.xs }}>
+      <Text numberOfLines={1} style={{ color: colors.textSecondary, fontSize: 12 }}>
+        {label}
+      </Text>
+      <Text style={{ fontSize: 24, fontWeight: "700", color: colors.text }}>
+        {formatRating(display)}
+      </Text>
+      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+        {tierLabel(display)}
+      </Text>
+    </Card>
+  );
+}
