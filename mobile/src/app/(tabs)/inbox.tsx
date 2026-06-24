@@ -4,7 +4,8 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { FlatList, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { FlatList, Pressable, Text, View } from "react-native";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { Screen } from "../../../components/ui/Screen";
@@ -92,6 +93,7 @@ function PendingCard({
   nameOf: (id: number) => string;
 }) {
   const qc = useQueryClient();
+  const router = useRouter();
 
   const act = useMutation({
     mutationFn: (action: "approved" | "disputed") =>
@@ -113,8 +115,11 @@ function PendingCard({
         {isDoubles ? "Doubles" : "Singles"} · {match.played_at}
       </Text>
 
-      {/* Scoreboard */}
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
+      {/* Scoreboard — tap to see full detail */}
+      <Pressable
+        onPress={() => router.push(`/match/${match.id}`)}
+        style={{ flexDirection: "row", alignItems: "center" }}
+      >
         <Text style={{ flex: 1, color: colors.text }}>
           {teamA.map((p) => nameOf(p.player_id)).join(" & ")}
         </Text>
@@ -124,7 +129,7 @@ function PendingCard({
         <Text style={{ flex: 1, textAlign: "right", color: colors.text }}>
           {teamB.map((p) => nameOf(p.player_id)).join(" & ")}
         </Text>
-      </View>
+      </Pressable>
 
       {act.isError ? (
         <Text style={{ color: colors.danger }}>

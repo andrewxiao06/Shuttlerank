@@ -43,6 +43,7 @@ export default function Home() {
             onSubmit={() => router.push("/submit")}
             onLeaderboard={() => router.push("/leaderboard")}
             onForecast={() => router.push("/forecast")}
+            onTournaments={() => router.push("/tournaments")}
             onSignOut={() => signOut()}
           />
         ) : null}
@@ -57,6 +58,7 @@ function HomeBody({
   onSubmit,
   onLeaderboard,
   onForecast,
+  onTournaments,
   onSignOut,
 }: {
   me: PlayerMe;
@@ -64,6 +66,7 @@ function HomeBody({
   onSubmit: () => void;
   onLeaderboard: () => void;
   onForecast: () => void;
+  onTournaments: () => void;
   onSignOut: () => void;
 }) {
   const rating = me.ratings[0];
@@ -103,6 +106,7 @@ function HomeBody({
         <QuickAction icon="add-circle-outline" label="Submit" onPress={onSubmit} />
         <QuickAction icon="podium-outline" label="Board" onPress={onLeaderboard} />
         <QuickAction icon="stats-chart-outline" label="Forecast" onPress={onForecast} />
+        <QuickAction icon="trophy-outline" label="Events" onPress={onTournaments} />
       </View>
 
       {/* Recent matches */}
@@ -159,12 +163,14 @@ function QuickAction({
 }
 
 function MatchRow({ match, viewerId }: { match: CategoryMatch; viewerId: number }) {
+  const router = useRouter();
   const me = match.participants.find((p) => p.player_id === viewerId);
   const youWon = me?.team === match.winner_team;
   const verified = match.status === "verified";
   const delta = me?.delta_display ?? 0;
 
   return (
+    <Pressable onPress={() => router.push(`/match/${match.id}`)}>
     <Card style={{ flexDirection: "row", alignItems: "center", padding: spacing.md }}>
       <View style={{ flex: 1 }}>
         <Text style={{ color: colors.text, fontWeight: "600" }}>
@@ -190,5 +196,6 @@ function MatchRow({ match, viewerId }: { match: CategoryMatch; viewerId: number 
         </Text>
       ) : null}
     </Card>
+    </Pressable>
   );
 }
