@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getLeaderboard, getMe } from "@/lib/api";
 import { TierChip } from "@/components/rating/TierChip";
 import { CalibrationDot } from "@/components/rating/CalibrationDot";
+import { PlayerSearch } from "@/components/player/PlayerSearch";
 import { formatRating } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +61,14 @@ export function LeaderboardView() {
         <p className="text-label uppercase text-text-secondary">Leaderboard</p>
         <h1 className="text-h1">Where you stand</h1>
       </header>
+
+      {/* Search any player → their profile */}
+      <div className="mt-5">
+        <PlayerSearch
+          onPick={(p) => router.push(`/players/${p.id}`)}
+          placeholder="Search for a player…"
+        />
+      </div>
 
       <div className="mt-4 flex items-center justify-between gap-3">
         <label className="inline-flex items-center gap-2 text-caption text-text-secondary">

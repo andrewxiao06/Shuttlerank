@@ -22,6 +22,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="sign-in" />
             {/* Detail routes get a native header with a back button. */}
+            <Stack.Screen name="player/[id]" options={{ headerShown: true, title: "Player" }} />
             <Stack.Screen name="match/[id]" options={{ headerShown: true, title: "Match" }} />
             <Stack.Screen name="tournaments/index" options={{ headerShown: true, title: "Tournaments" }} />
             <Stack.Screen name="tournaments/[id]" options={{ headerShown: true, title: "Tournament" }} />

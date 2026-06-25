@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { ActivityIndicator, FlatList, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { PlayerSearch } from "../../../components/PlayerSearch";
 import { getLeaderboard } from "../../../lib/api/client";
 import { formatRating, tierLabel, isCalibrating } from "../../../lib/format";
 import { colors, spacing } from "../../../lib/theme";
@@ -19,6 +21,7 @@ import { colors, spacing } from "../../../lib/theme";
  *    must be inside a <Text> or RN throws.
  */
 export default function Leaderboard() {
+  const router = useRouter();
   const q = useQuery({
     queryKey: ["leaderboard"],
     queryFn: () => getLeaderboard(),
@@ -71,10 +74,19 @@ export default function Leaderboard() {
       <FlatList
         data={q.data.entries}
         keyExtractor={(item) => String(item.player_id)}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           paddingHorizontal: spacing.lg,
           paddingBottom: spacing.xl,
         }}
+        ListHeaderComponent={
+          <View style={{ marginBottom: spacing.md }}>
+            <PlayerSearch
+              onPick={(p) => router.push(`/player/${p.id}`)}
+              placeholder="Search for a player…"
+            />
+          </View>
+        }
         ListEmptyComponent={
           <Text
             style={{
@@ -87,7 +99,8 @@ export default function Leaderboard() {
           </Text>
         }
         renderItem={({ item }) => (
-          <View
+          <Pressable
+            onPress={() => router.push(`/player/${item.player_id}`)}
             style={{
               flexDirection: "row",
               alignItems: "center",
@@ -122,7 +135,7 @@ export default function Leaderboard() {
             <Text style={{ fontSize: 20, fontWeight: "700", color: colors.text }}>
               {formatRating(item.display)}
             </Text>
-          </View>
+          </Pressable>
         )}
       />
     </SafeAreaView>

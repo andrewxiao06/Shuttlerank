@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getPlayer, listPlayerMatches } from "@/lib/api";
 import { type CategoryRating } from "@/lib/api/types";
@@ -16,7 +17,11 @@ import { isCalibrating } from "@/lib/tier";
  * rating per player, so the hero card is the whole story: rating, tier,
  * calibration state, and ceiling progress. Chart + match list below.
  */
+const RECENT_COUNT = 5;
+
 export function ProfileView({ playerId }: { playerId: number }) {
+  const [showAll, setShowAll] = useState(false);
+
   const playerQ = useQuery({
     queryKey: ["player", playerId],
     queryFn: () => getPlayer(playerId),
@@ -88,32 +93,51 @@ export function ProfileView({ playerId }: { playerId: number }) {
         )}
       </section>
 
-      {/* Recent matches */}
-      <section className="mt-8 space-y-3">
-        <h2 className="text-h3">Recent matches</h2>
-        {matchesQ.isPending ? (
-          <SkeletonList />
-        ) : (matchesQ.data?.length ?? 0) === 0 ? (
-          <div className="rounded-lg border border-dashed border-border p-6 text-center text-caption text-text-muted">
-            No matches yet.
-          </div>
-        ) : (
-          <ul className="space-y-2">
-            {(matchesQ.data ?? [])
-              .slice()
-              .sort((a, b) => b.played_at.localeCompare(a.played_at))
-              .map((m) => (
-                <li key={m.id}>
-                  <MatchRow
-                    match={m}
-                    viewerId={playerId}
-                    href={`/matches/${m.id}`}
-                  />
-                </li>
-              ))}
-          </ul>
-        )}
-      </section>
+      {/* Match history — recent by default, "Show all" to expand */}
+      {(() => {
+        const sorted = (matchesQ.data ?? [])
+          .slice()
+          .sort((a, b) => b.played_at.localeCompare(a.played_at));
+        const shown = showAll ? sorted : sorted.slice(0, RECENT_COUNT);
+        const hasMore = sorted.length > RECENT_COUNT;
+        return (
+          <section className="mt-8 space-y-3">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-h3">
+                {showAll ? "Match history" : "Recent matches"}
+              </h2>
+              {hasMore ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAll((v) => !v)}
+                  className="text-caption text-primary underline-offset-2 hover:underline"
+                >
+                  {showAll ? "Show recent" : `Show all (${sorted.length})`}
+                </button>
+              ) : null}
+            </div>
+            {matchesQ.isPending ? (
+              <SkeletonList />
+            ) : sorted.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border p-6 text-center text-caption text-text-muted">
+                No matches yet.
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {shown.map((m) => (
+                  <li key={m.id}>
+                    <MatchRow
+                      match={m}
+                      viewerId={playerId}
+                      href={`/matches/${m.id}`}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })()}
     </main>
   );
 }

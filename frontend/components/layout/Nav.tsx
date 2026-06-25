@@ -32,7 +32,7 @@ export function TopNav() {
     <header className="sticky top-0 z-30 hidden h-16 border-b border-border bg-background/95 backdrop-blur md:block">
       <nav className="mx-auto flex h-full max-w-5xl items-center justify-between gap-6 px-6">
         <Link href="/" className="text-h3 font-semibold tracking-tight">
-          DUBR
+          ShuttleRank
         </Link>
         <ul className="flex items-center gap-1">
           {LINKS.map((l) => {
