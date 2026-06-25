@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { Avatar } from "./ui/Avatar";
 import { Card } from "./ui/Card";
 import { AsyncBoundary } from "./ui/AsyncBoundary";
 import { getPlayer, listPlayerMatches } from "../lib/api/client";
@@ -78,14 +79,24 @@ function Body({
 
   return (
     <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-      {/* Name */}
-      <View>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, textTransform: "uppercase" }}>
-          Player
-        </Text>
-        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>
-          {player.display_name ?? player.name}
-        </Text>
+      {/* Name + avatar */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+        <Avatar src={player.avatar_url} name={player.display_name ?? player.name} size={64} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: colors.textSecondary, fontSize: 13, textTransform: "uppercase" }}>
+            Player
+          </Text>
+          <Text style={{ fontSize: 26, fontWeight: "800", color: colors.text }}>
+            {player.display_name ?? player.name}
+          </Text>
+          {player.age != null || player.location ? (
+            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+              {[player.age != null ? `${player.age}` : null, player.location]
+                .filter(Boolean)
+                .join(" · ")}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
       {/* Hero rating */}

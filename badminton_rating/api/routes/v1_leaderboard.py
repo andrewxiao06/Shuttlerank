@@ -79,6 +79,9 @@ async def overall_leaderboard(
             calibrating=rating.rd > 150.0,
             ceiling=rating.ceiling,
             match_count=rating.match_count,
+            avatar_url=player.avatar_url,
+            age=player.age,
+            location=player.location,
         ))
     return CategoryLeaderboardOut(
         total=total,

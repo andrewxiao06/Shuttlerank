@@ -132,6 +132,9 @@ export const PlayerMeSchema = z.object({
   display_name: z.string().nullable(),
   email: z.string().nullable(),
   gender: PlayerGenderSchema.nullable(),
+  avatar_url: z.string().nullable().optional(),
+  age: z.number().int().nullable().optional(),
+  location: z.string().nullable().optional(),
   created_at: z.string(),
   // Single-element list holding the player's one overall rating.
   ratings: z.array(CategoryRatingSchema),
@@ -143,6 +146,9 @@ export type PlayerMe = z.infer<typeof PlayerMeSchema>;
 export const PlayerMePatchSchema = z.object({
   display_name: z.string().max(120).nullable().optional(),
   gender: PlayerGenderSchema.nullable().optional(),
+  age: z.number().int().min(5).max(120).nullable().optional(),
+  location: z.string().max(120).nullable().optional(),
+  avatar_url: z.string().max(512).nullable().optional(),
   // Self-selected starting level (1.0–4.5). Only honored before first match.
   starting_rating: z.number().min(1).max(4.5).optional(),
 });
@@ -154,6 +160,7 @@ export const PlayerBootstrapSchema = z.object({
   display_name: z.string().max(120).nullable().optional(),
   email: z.string().max(320).nullable().optional(),
   gender: PlayerGenderSchema.nullable().optional(),
+  avatar_url: z.string().max(512).nullable().optional(),
 });
 export type PlayerBootstrap = z.infer<typeof PlayerBootstrapSchema>;
 
@@ -258,6 +265,9 @@ export const LeaderboardEntrySchema = z.object({
   calibrating: z.boolean(),
   ceiling: z.number(),
   match_count: z.number().int(),
+  avatar_url: z.string().nullable().optional(),
+  age: z.number().int().nullable().optional(),
+  location: z.string().nullable().optional(),
 });
 export type LeaderboardEntry = z.infer<typeof LeaderboardEntrySchema>;
 

@@ -49,6 +49,10 @@ class PlayerMeOut(BaseModel):
     display_name: Optional[str]
     email: Optional[str]
     gender: Optional[PlayerGender]
+    # Optional profile metadata (avatar typically the Google photo from Clerk).
+    avatar_url: Optional[str] = None
+    age: Optional[int] = None
+    location: Optional[str] = None
     created_at: datetime
     # Single-element list holding the player's one OVERALL rating. Kept as a
     # list so the response shape survives any future multi-rating revival.
@@ -60,6 +64,9 @@ class PlayerMeOut(BaseModel):
 class PlayerMePatch(BaseModel):
     display_name: Optional[str] = Field(None, max_length=120)
     gender: Optional[PlayerGender] = None
+    age: Optional[int] = Field(None, ge=5, le=120)
+    location: Optional[str] = Field(None, max_length=120)
+    avatar_url: Optional[str] = Field(None, max_length=512)
     # Self-selected starting level (display scale). Only honored before the
     # player has any verified matches; capped at the casual ceiling (4.5).
     starting_rating: Optional[float] = Field(None, ge=1.0, le=4.5)
@@ -181,6 +188,9 @@ class CategoryLeaderboardEntry(BaseModel):
     calibrating: bool
     ceiling: float
     match_count: int
+    avatar_url: Optional[str] = None
+    age: Optional[int] = None
+    location: Optional[str] = None
 
 
 class CategoryLeaderboardOut(BaseModel):

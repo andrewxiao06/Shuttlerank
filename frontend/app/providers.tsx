@@ -107,6 +107,7 @@ function PlayerAutoBootstrap() {
               "Player",
             display_name: user.firstName ?? null,
             email: user.primaryEmailAddress?.emailAddress ?? null,
+            avatar_url: user.imageUrl ?? null,
           });
           // Invalidate cached queries so screens refetch with the new
           // Player row in scope. Cheaper + safer than a full reload.

@@ -200,6 +200,11 @@ class Player(Base):
         Enum(PlayerGender, name="playergender"), nullable=True
     )
     display_name: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
+    # Optional profile metadata. avatar_url is typically the Google photo from
+    # Clerk; all three are nullable (profile picture is optional, like DUPR).
+    avatar_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    age: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    location: Mapped[Optional[str]] = mapped_column(String(120), nullable=True)
 
     # Relationships
     match_appearances: Mapped[List["MatchPlayer"]] = relationship(

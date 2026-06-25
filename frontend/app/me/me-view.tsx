@@ -63,6 +63,8 @@ export function MeSettingsView() {
   const [displayName, setDisplayName] = useState("");
   const [gender, setGender] = useState<PlayerGender | "">("");
   const [level, setLevel] = useState<number | null>(null);
+  const [age, setAge] = useState("");
+  const [location, setLocation] = useState("");
 
   // Hydrate the form once the player loads. Empty form fields stay empty
   // intentionally — we don't want to overwrite a user's in-progress edit.
@@ -71,6 +73,8 @@ export function MeSettingsView() {
       setDisplayName(meQ.data.display_name ?? meQ.data.name ?? "");
       setGender((meQ.data.gender as PlayerGender | null) ?? "");
       setLevel(meQ.data.ratings[0]?.display ?? null);
+      setAge(meQ.data.age != null ? String(meQ.data.age) : "");
+      setLocation(meQ.data.location ?? "");
     }
   }, [meQ.data]);
 
@@ -83,6 +87,8 @@ export function MeSettingsView() {
       patchMe({
         display_name: displayName.trim() || null,
         gender: gender ? PlayerGenderSchema.parse(gender) : null,
+        age: age.trim() ? Number(age) : null,
+        location: location.trim() || null,
         starting_rating: canPickLevel && level != null ? level : undefined,
       }),
     onSuccess: async () => {
@@ -136,6 +142,34 @@ export function MeSettingsView() {
             Shown on the leaderboard, in match cards, and on your profile.
           </p>
         </label>
+
+        <div className="grid grid-cols-2 gap-4">
+          <label className="block">
+            <span className="text-label uppercase text-text-secondary">
+              Age (optional)
+            </span>
+            <input
+              type="text"
+              inputMode="numeric"
+              value={age}
+              onChange={(e) => setAge(e.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
+              placeholder="e.g. 27"
+              className="mt-2 block h-12 w-full rounded-md border border-border bg-surface px-3 text-body-md outline-none focus:border-primary"
+            />
+          </label>
+          <label className="block">
+            <span className="text-label uppercase text-text-secondary">
+              Location (optional)
+            </span>
+            <input
+              type="text"
+              value={location}
+              onChange={(e) => setLocation(e.target.value.slice(0, 120))}
+              placeholder="e.g. NJ, US"
+              className="mt-2 block h-12 w-full rounded-md border border-border bg-surface px-3 text-body-md outline-none focus:border-primary"
+            />
+          </label>
+        </div>
 
         <fieldset>
           <legend className="text-label uppercase text-text-secondary">
