@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { PlayerSearch } from "../../../components/PlayerSearch";
+import { Avatar } from "../../../components/ui/Avatar";
 import { getLeaderboard } from "../../../lib/api/client";
 import { formatRating, tierLabel, isCalibrating } from "../../../lib/format";
 import { colors, spacing } from "../../../lib/theme";
@@ -116,18 +117,29 @@ export default function Leaderboard() {
           >
             {/* Rank */}
             <Text
-              style={{ width: 32, color: colors.textSecondary, fontWeight: "600" }}
+              style={{ width: 28, color: colors.textSecondary, fontWeight: "600" }}
             >
               {item.rank}
             </Text>
 
-            {/* Name + tier (flex: 1 takes the remaining width) */}
+            {/* Avatar */}
+            <View style={{ marginRight: spacing.sm }}>
+              <Avatar src={item.avatar_url} name={item.name} size={36} />
+            </View>
+
+            {/* Name + meta (flex: 1 takes the remaining width) */}
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 16, fontWeight: "600", color: colors.text }}>
                 {item.name}
               </Text>
               <Text style={{ fontSize: 12, color: colors.textMuted }}>
-                {tierLabel(item.display)}
+                {[
+                  tierLabel(item.display),
+                  item.age != null ? `${item.age}` : null,
+                  item.location,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
               </Text>
             </View>
 

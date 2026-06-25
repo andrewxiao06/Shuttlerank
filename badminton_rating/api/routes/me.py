@@ -126,11 +126,9 @@ async def _set_starting_rating(
     await session.flush()
 
 
-@router.get("/me", response_model=PlayerMeOut)
-async def get_me(
-    player: Player = Depends(current_player),
-    session: AsyncSession = Depends(get_db),
-) -> PlayerMeOut:
+async def player_me_out(session: AsyncSession, player: Player) -> PlayerMeOut:
+    """Build the full PlayerMeOut for a Player. Single source of truth so new
+    profile fields land everywhere /me-shaped responses are returned."""
     return PlayerMeOut(
         id=player.id,
         clerk_user_id=player.clerk_user_id,
@@ -138,10 +136,21 @@ async def get_me(
         display_name=player.display_name,
         email=player.email,
         gender=player.gender,
+        avatar_url=player.avatar_url,
+        age=player.age,
+        location=player.location,
         created_at=player.created_at,
         ratings=await _category_ratings(session, player.id),
         is_admin=is_admin_user(player.clerk_user_id),
     )
+
+
+@router.get("/me", response_model=PlayerMeOut)
+async def get_me(
+    player: Player = Depends(current_player),
+    session: AsyncSession = Depends(get_db),
+) -> PlayerMeOut:
+    return await player_me_out(session, player)
 
 
 @router.patch("/me", response_model=PlayerMeOut)
@@ -154,18 +163,14 @@ async def patch_me(
         player.display_name = payload.display_name
     if payload.gender is not None:
         player.gender = payload.gender
+    if payload.age is not None:
+        player.age = payload.age
+    if payload.location is not None:
+        player.location = payload.location
+    if payload.avatar_url is not None:
+        player.avatar_url = payload.avatar_url
     if payload.starting_rating is not None:
         await _set_starting_rating(session, player.id, payload.starting_rating)
     await session.commit()
     await session.refresh(player)
-    return PlayerMeOut(
-        id=player.id,
-        clerk_user_id=player.clerk_user_id,
-        name=player.name,
-        display_name=player.display_name,
-        email=player.email,
-        gender=player.gender,
-        created_at=player.created_at,
-        ratings=await _category_ratings(session, player.id),
-        is_admin=is_admin_user(player.clerk_user_id),
-    )
+    return await player_me_out(session, player)

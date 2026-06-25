@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getLeaderboard, getMe } from "@/lib/api";
 import { TierChip } from "@/components/rating/TierChip";
 import { CalibrationDot } from "@/components/rating/CalibrationDot";
+import { Avatar } from "@/components/player/Avatar";
 import { PlayerSearch } from "@/components/player/PlayerSearch";
 import { formatRating } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -130,13 +131,25 @@ export function LeaderboardView() {
                       {e.rank}
                     </span>
                     <span className="flex min-w-0 items-center gap-2 truncate text-body-md">
+                      <Avatar src={e.avatar_url} name={e.name} size={32} />
                       <CalibrationDot show={e.calibrating} />
-                      <span className="truncate">{e.name}</span>
-                      {isMe ? (
-                        <span className="rounded-full bg-primary px-2 py-0.5 text-label uppercase text-on-primary">
-                          You
+                      <span className="min-w-0">
+                        <span className="block truncate">
+                          {e.name}
+                          {isMe ? (
+                            <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-label uppercase text-on-primary">
+                              You
+                            </span>
+                          ) : null}
                         </span>
-                      ) : null}
+                        {(e.age != null || e.location) ? (
+                          <span className="block truncate text-caption text-text-muted">
+                            {[e.age != null ? `${e.age}` : null, e.location]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
                     <span className="hidden text-right text-numeral-sm text-text-secondary sm:block">
                       {e.match_count}

@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getPlayer, listPlayerMatches } from "@/lib/api";
 import { type CategoryRating } from "@/lib/api/types";
 import { MatchRow } from "@/components/match/MatchRow";
+import { Avatar } from "@/components/player/Avatar";
 import { TierChip } from "@/components/rating/TierChip";
 import { CalibrationDot } from "@/components/rating/CalibrationDot";
 import { CeilingBar } from "@/components/rating/CeilingBar";
@@ -51,9 +52,19 @@ export function ProfileView({ playerId }: { playerId: number }) {
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pb-24 pt-6 sm:px-6 lg:max-w-5xl">
       {/* Header */}
-      <header className="space-y-1">
-        <p className="text-label uppercase text-text-secondary">Player</p>
-        <h1 className="text-h1">{player.display_name ?? player.name}</h1>
+      <header className="flex items-center gap-4">
+        <Avatar src={player.avatar_url} name={player.display_name ?? player.name} size={64} />
+        <div className="space-y-1">
+          <p className="text-label uppercase text-text-secondary">Player</p>
+          <h1 className="text-h1">{player.display_name ?? player.name}</h1>
+          {(player.age != null || player.location) ? (
+            <p className="text-caption text-text-secondary">
+              {[player.age != null ? `${player.age}` : null, player.location]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          ) : null}
+        </div>
       </header>
 
       {/* Hero rating */}

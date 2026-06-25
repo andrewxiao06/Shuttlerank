@@ -56,6 +56,7 @@ export function AuthSync() {
               "Player",
             display_name: user.firstName ?? null,
             email: user.primaryEmailAddress?.emailAddress ?? null,
+            avatar_url: user.imageUrl ?? null,
           });
           await qc.invalidateQueries();
         } catch {

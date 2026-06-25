@@ -24,7 +24,7 @@ from badminton_rating.api.models.v1 import (
     PlayerMeOut,
 )
 from badminton_rating.api.routes.admin import is_admin_user
-from badminton_rating.api.routes.me import _category_ratings
+from badminton_rating.api.routes.me import _category_ratings, player_me_out
 from badminton_rating.api.routes.v1_matches import _participant_out
 from badminton_rating.db.models import (
     Match,
@@ -50,6 +50,8 @@ class BootstrapBody(BaseModel):
     display_name: str | None = Field(None, max_length=120)
     email: str | None = Field(None, max_length=320)
     gender: PlayerGender | None = None
+    # Google profile photo from Clerk's useUser().imageUrl — optional.
+    avatar_url: str | None = Field(None, max_length=512)
 
 
 @router.post(
@@ -95,22 +97,18 @@ async def bootstrap_current_player(
             display_name=body.display_name or body.name,
             email=body.email,
             gender=body.gender,
+            avatar_url=body.avatar_url,
         )
         session.add(existing)
         await session.commit()
         await session.refresh(existing)
+    elif body.avatar_url and not existing.avatar_url:
+        # Backfill the avatar for players created before we captured it.
+        existing.avatar_url = body.avatar_url
+        await session.commit()
+        await session.refresh(existing)
 
-    return PlayerMeOut(
-        id=existing.id,
-        clerk_user_id=existing.clerk_user_id,
-        name=existing.name,
-        display_name=existing.display_name,
-        email=existing.email,
-        gender=existing.gender,
-        created_at=existing.created_at,
-        ratings=await _category_ratings(session, existing.id),
-        is_admin=is_admin_user(existing.clerk_user_id),
-    )
+    return await player_me_out(session, existing)
 
 
 @router.get("", response_model=List[PlayerMeOut])
@@ -135,19 +133,7 @@ async def search_players(
     stmt = stmt.order_by(Player.name).limit(limit)
 
     players = (await session.execute(stmt)).scalars().all()
-    return [
-        PlayerMeOut(
-            id=p.id,
-            clerk_user_id=p.clerk_user_id,
-            name=p.name,
-            display_name=p.display_name,
-            email=p.email,
-            gender=p.gender,
-            created_at=p.created_at,
-            ratings=await _category_ratings(session, p.id),
-        )
-        for p in players
-    ]
+    return [await player_me_out(session, p) for p in players]
 
 
 @router.get("/{player_id}/matches", response_model=List[CategoryMatchOut])
@@ -208,13 +194,4 @@ async def get_v1_player(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"player {player_id} not found",
         )
-    return PlayerMeOut(
-        id=player.id,
-        clerk_user_id=player.clerk_user_id,
-        name=player.name,
-        display_name=player.display_name,
-        email=player.email,
-        gender=player.gender,
-        created_at=player.created_at,
-        ratings=await _category_ratings(session, player.id),
-    )
+    return await player_me_out(session, player)
