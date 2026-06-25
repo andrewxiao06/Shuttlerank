@@ -43,6 +43,7 @@ from badminton_rating.services.categories import (
     submit_category_match,
     verify_pending_match,
 )
+from badminton_rating.services.notifications import notify_pending_match
 
 
 router = APIRouter(prefix="/v1/matches", tags=["v1-matches"])
@@ -130,6 +131,9 @@ async def create_v1_match(
         )
     await session.commit()
     await session.refresh(match, attribute_names=["participants"])
+    # Email the other participants that a match awaits their approval.
+    # Best-effort — never blocks or fails the submission.
+    await notify_pending_match(session, match)
     return _match_to_out(match)
 
 

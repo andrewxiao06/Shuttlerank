@@ -48,7 +48,7 @@ with the web app as a secondary surface.
    - Verify real data end-to-end (the account-switch cache fix `a0ecf15` only
      shows its effect once off mocks).
 
-**3. Mobile app — Expo / React Native** ⬜ **(priority)** — *full build plan in `MOBILE.md`*
+**3. Mobile app — Expo / React Native** 🚧 **(priority)** — *full build plan in `MOBILE.md`*
    - **Reuses the FastAPI backend 100%** — it's a REST API; the deploy work
      above is the shared foundation. Also reuses TS types, Zod schemas, and
      the API-client/business logic; the **UI is rebuilt** in React Native
@@ -59,6 +59,26 @@ with the web app as a secondary surface.
      step 1 is required, not optional.
    - **Store publishing fees** (deferred until ready to submit; build+test is
      free): Apple Developer **$99/yr**, Google Play **$25 one-time**.
+   - Branding: app renamed **ShuttleRank** (display name). Expo slug/scheme
+     still `mobile` — rename deliberately right before the first store build
+     (scheme is tied to the OAuth redirect).
+   - ✅ Built: auth, Home, Leaderboard (+ player search), Profile, Submit,
+     Inbox, Forecast, Match detail, Tournaments, view-any-player profiles
+     with recent/all match history.
+
+**4. Notifications** 🚧
+   - **In-app** ✅ — the Inbox lists pending matches (both web + mobile).
+   - **Email** ✅ built (backend) ⬜ needs key+deploy — when a match is
+     submitted, the other participants get an email to approve it. Provider:
+     **Resend** (`services/email.py` + `services/notifications.py`,
+     best-effort: no key → no-op, never blocks submission). To enable:
+     create a Resend API key, set `RESEND_API_KEY` / `EMAIL_FROM` / `APP_URL`
+     in `.env.prod` (see `.env.prod.example`), redeploy. `onboarding@resend.dev`
+     works without a verified domain.
+   - **Push** ⬜ — deferred: Expo push needs a *development build* (not Expo
+     Go), so bundle it with the first `eas build` for the store.
+   - **Future**: per-user channel preference (email on/off) — currently email
+     goes to any participant with an address on file.
 
 ---
 
