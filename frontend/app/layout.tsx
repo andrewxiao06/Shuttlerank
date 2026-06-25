@@ -21,7 +21,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DUBR — Badminton Rating",
+  title: "ShuttleRank — Badminton Rating",
   description: "Casual-friendly badminton rating system",
 };
 

@@ -70,7 +70,7 @@ export default function SignIn() {
       >
         <Text style={{ fontSize: 40 }}>🏸</Text>
         <Text style={{ fontSize: 30, fontWeight: "800", color: colors.text }}>
-          DUBR
+          ShuttleRank
         </Text>
         <Text
           style={{

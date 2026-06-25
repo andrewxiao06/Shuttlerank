@@ -139,7 +139,7 @@ export function HomeView() {
 function SignedOutHero() {
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center px-4 py-16 text-center sm:px-6">
-      <p className="text-label uppercase text-primary">DUBR</p>
+      <p className="text-label uppercase text-primary">ShuttleRank</p>
       <h1 className="mt-3 text-display-lg">Badminton, rated.</h1>
       <p className="mt-4 max-w-md text-body-md text-text-secondary">
         One rating, every match. Play anyone, get your opponents to approve,
