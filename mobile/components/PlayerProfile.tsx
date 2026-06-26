@@ -21,9 +21,11 @@ const RECENT_COUNT = 5;
 export function PlayerProfile({
   player,
   playerId,
+  onEdit,
 }: {
   player?: PlayerMe; // pass when already loaded (the Profile tab / "me")
   playerId?: number; // pass to fetch a specific player
+  onEdit?: () => void; // when set, shows an "Edit" button (your own profile)
 }) {
   // When given a player object use it; otherwise fetch by id.
   const playerQ = useQuery({
@@ -52,6 +54,7 @@ export function PlayerProfile({
           player={resolved}
           matches={matchesQ.data ?? []}
           matchesLoading={matchesQ.isPending}
+          onEdit={onEdit}
         />
       ) : null}
     </AsyncBoundary>
@@ -62,10 +65,12 @@ function Body({
   player,
   matches,
   matchesLoading,
+  onEdit,
 }: {
   player: PlayerMe;
   matches: CategoryMatch[];
   matchesLoading: boolean;
+  onEdit?: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
   const rating = player.ratings[0];
@@ -97,6 +102,20 @@ function Body({
             </Text>
           ) : null}
         </View>
+        {onEdit ? (
+          <Pressable
+            onPress={onEdit}
+            style={{
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: radius.md,
+              paddingVertical: spacing.sm,
+              paddingHorizontal: spacing.md,
+            }}
+          >
+            <Text style={{ color: colors.text, fontWeight: "600" }}>Edit</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       {/* Hero rating */}
