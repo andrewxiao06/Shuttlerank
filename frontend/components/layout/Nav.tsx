@@ -89,8 +89,8 @@ export function TopNav() {
             <UserButton>
               <UserButton.MenuItems>
                 <UserButton.Link
-                  label="Settings"
-                  labelIcon={<span aria-hidden>⚙</span>}
+                  label="My profile"
+                  labelIcon={<span aria-hidden>🏸</span>}
                   href="/me"
                 />
               </UserButton.MenuItems>

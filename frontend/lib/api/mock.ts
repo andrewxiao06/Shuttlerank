@@ -93,6 +93,8 @@ export async function patchMe(patch: PlayerMePatch): Promise<PlayerMe> {
     store.me = { ...store.me, age: patch.age ?? null };
   if (patch.location !== undefined)
     store.me = { ...store.me, location: patch.location ?? null };
+  if (patch.avatar_url !== undefined)
+    store.me = { ...store.me, avatar_url: patch.avatar_url ?? null };
   if (patch.starting_rating != null) {
     const current = store.me.ratings[0];
     if (current && current.match_count === 0) {

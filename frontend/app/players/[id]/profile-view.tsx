@@ -1,10 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { getPlayer, listPlayerMatches } from "@/lib/api";
 import { type CategoryRating } from "@/lib/api/types";
-import { MatchRow } from "@/components/match/MatchRow";
+import { MatchHistory } from "@/components/player/MatchHistory";
 import { Avatar } from "@/components/player/Avatar";
 import { TierChip } from "@/components/rating/TierChip";
 import { CalibrationDot } from "@/components/rating/CalibrationDot";
@@ -14,15 +13,11 @@ import { formatRating } from "@/lib/format";
 import { isCalibrating } from "@/lib/tier";
 
 /*
- * Profile view — DESIGN.md "Your rating is the hero." One universal
- * rating per player, so the hero card is the whole story: rating, tier,
- * calibration state, and ceiling progress. Chart + match list below.
+ * Public profile view — read-only. "Your rating is the hero": the hero card
+ * is rating, tier, calibration, ceiling; then the rating chart and match
+ * history. The editable version of your own profile lives at /me.
  */
-const RECENT_COUNT = 5;
-
 export function ProfileView({ playerId }: { playerId: number }) {
-  const [showAll, setShowAll] = useState(false);
-
   const playerQ = useQuery({
     queryKey: ["player", playerId],
     queryFn: () => getPlayer(playerId),
@@ -105,50 +100,7 @@ export function ProfileView({ playerId }: { playerId: number }) {
       </section>
 
       {/* Match history — recent by default, "Show all" to expand */}
-      {(() => {
-        const sorted = (matchesQ.data ?? [])
-          .slice()
-          .sort((a, b) => b.played_at.localeCompare(a.played_at));
-        const shown = showAll ? sorted : sorted.slice(0, RECENT_COUNT);
-        const hasMore = sorted.length > RECENT_COUNT;
-        return (
-          <section className="mt-8 space-y-3">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-h3">
-                {showAll ? "Match history" : "Recent matches"}
-              </h2>
-              {hasMore ? (
-                <button
-                  type="button"
-                  onClick={() => setShowAll((v) => !v)}
-                  className="text-caption text-primary underline-offset-2 hover:underline"
-                >
-                  {showAll ? "Show recent" : `Show all (${sorted.length})`}
-                </button>
-              ) : null}
-            </div>
-            {matchesQ.isPending ? (
-              <SkeletonList />
-            ) : sorted.length === 0 ? (
-              <div className="rounded-lg border border-dashed border-border p-6 text-center text-caption text-text-muted">
-                No matches yet.
-              </div>
-            ) : (
-              <ul className="space-y-2">
-                {shown.map((m) => (
-                  <li key={m.id}>
-                    <MatchRow
-                      match={m}
-                      viewerId={playerId}
-                      href={`/matches/${m.id}`}
-                    />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        );
-      })()}
+      <MatchHistory playerId={playerId} />
     </main>
   );
 }
@@ -160,16 +112,6 @@ function ProfileSkeleton() {
       <div className="h-48 rounded-xl bg-surface-muted" />
       <div className="h-44 rounded-lg bg-surface-muted" />
     </main>
-  );
-}
-
-function SkeletonList() {
-  return (
-    <ul className="space-y-2">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <li key={i} className="h-20 animate-pulse rounded-lg bg-surface-muted" />
-      ))}
-    </ul>
   );
 }
 
