@@ -1,12 +1,25 @@
 # Badminton Rating System — Claude Code Context
 
-## ⚠️ EC2 deploy is Andrew's to do — hands off
+## EC2 deploy — Claude can drive it (as of June 2026)
 
-Andrew wants to learn the AWS EC2 setup himself. Do NOT perform or automate
-any part of it (no provisioning, no SSH commands, no remote docker runs, no
-writing setup scripts that do it for him). When he asks for help, give hints
-and pointers — nudge toward the next step in `DEPLOY.md`, explain concepts,
-review what he's done — but let him drive every command.
+Andrew has learned the AWS EC2 setup and now authorizes Claude to deploy
+directly. Standard deploy (run from Andrew's Mac, which has SSH access):
+
+```bash
+ssh -i <dubr-key.pem> ubuntu@<EC2_PUBLIC_IP> \
+  "cd ~/dubr && git pull && \
+   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build"
+```
+
+- The box is `ubuntu@<public IP>` (currently `100.30.188.128`); the repo is
+  cloned at `~/dubr` on the box; GitHub creds + `.env.prod` are already there.
+- The api entrypoint runs `alembic upgrade head` automatically, so migrations
+  apply on deploy — no separate step.
+- Always `git push` from the Mac first so the box's `git pull` has the commits.
+- If SSH hangs, the security-group port-22 rule is pinned to a stale IP —
+  it's set to Andrew's IP / Anywhere; he manages that rule.
+- Verify after: `... logs --tail 15 api` → "Application startup complete",
+  and `curl https://dubr.mooo.com/health`.
 
 ## Project Overview
 
