@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/tournaments", label: "Tournaments" },
   { href: "/forecast", label: "Forecast" },
   { href: "/inbox", label: "Inbox" },
+  { href: "/me", label: "Profile" },
 ] as const;
 
 export function TopNav() {

@@ -91,7 +91,8 @@ export default function EditProfile() {
       await user.reload();
       await patchMe({ avatar_url: user.imageUrl });
       setAvatar(user.imageUrl);
-      await qc.invalidateQueries({ queryKey: ["me"] });
+      // Match rows embed the avatar url too — refresh everything, not just me.
+      await qc.invalidateQueries();
     } catch (e) {
       setPhotoError((e as Error)?.message ?? "Couldn't upload photo.");
     } finally {
