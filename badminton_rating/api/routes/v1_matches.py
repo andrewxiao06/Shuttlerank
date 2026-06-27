@@ -13,6 +13,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from badminton_rating.api.auth import current_player
 from badminton_rating.api.models.v1 import (
@@ -73,9 +74,15 @@ def _match_to_out(match: Match) -> CategoryMatchOut:
 def _participant_out(p: MatchPlayer) -> MatchParticipantOut:
     pre_display = to_display_rating(p.pre_r)
     post_display = to_display_rating(p.post_r)
+    # p.player is eager-loaded by the match-loading helpers below.
+    player = p.player
+    name = (player.display_name or player.name) if player else f"Player #{p.player_id}"
+    avatar_url = player.avatar_url if player else None
     return MatchParticipantOut(
         player_id=p.player_id,
         team=p.team.value,
+        name=name,
+        avatar_url=avatar_url,
         pre_r=p.pre_r,
         post_r=p.post_r,
         delta_r=p.delta_r,
@@ -85,14 +92,24 @@ def _participant_out(p: MatchPlayer) -> MatchParticipantOut:
     )
 
 
+# Eager-load participants AND their player rows so _participant_out can read
+# names/avatars without lazy-loading (which raises in async).
+_PARTICIPANTS_WITH_PLAYER = selectinload(Match.participants).selectinload(
+    MatchPlayer.player
+)
+
+
 async def _load_match_or_404(session: AsyncSession, match_id: int) -> Match:
-    match = await session.get(Match, match_id)
+    match = (await session.execute(
+        select(Match)
+        .where(Match.id == match_id)
+        .options(_PARTICIPANTS_WITH_PLAYER)
+    )).scalar_one_or_none()
     if match is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"match {match_id} not found",
         )
-    await session.refresh(match, attribute_names=["participants"])
     return match
 
 
@@ -130,11 +147,12 @@ async def create_v1_match(
             detail=str(e),
         )
     await session.commit()
-    await session.refresh(match, attribute_names=["participants"])
     # Email the other participants that a match awaits their approval.
     # Best-effort — never blocks or fails the submission.
+    await session.refresh(match, attribute_names=["participants"])
     await notify_pending_match(session, match)
-    return _match_to_out(match)
+    # Reload with player rows eager-loaded so the response carries names/avatars.
+    return _match_to_out(await _load_match_or_404(session, match.id))
 
 
 # ---------------------------------------------------------------------------
@@ -172,13 +190,10 @@ async def pending_inbox(
         .where(Match.id.not_in(acted_subq))
         .where(Match.status == MatchStatus.PENDING)
         .order_by(Match.created_at.desc())
+        .options(_PARTICIPANTS_WITH_PLAYER)
     )
     matches = (await session.execute(stmt)).scalars().all()
-    out: List[CategoryMatchOut] = []
-    for m in matches:
-        await session.refresh(m, attribute_names=["participants"])
-        out.append(_match_to_out(m))
-    return out
+    return [_match_to_out(m) for m in matches]
 
 
 # ---------------------------------------------------------------------------

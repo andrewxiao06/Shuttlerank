@@ -4,17 +4,16 @@ import Link from "next/link";
 import { useState } from "react";
 import {
   useMutation,
-  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import {
   getMatch,
   getMe,
-  getPlayer,
   validateMatch,
 } from "@/lib/api";
 import { type MatchParticipant } from "@/lib/api/types";
+import { Avatar } from "@/components/player/Avatar";
 import { StatusBanner } from "@/components/match/StatusBanner";
 import { ReportModal } from "@/components/match/ReportModal";
 import { DeltaPill } from "@/components/match/DeltaPill";
@@ -23,15 +22,14 @@ import { formatRating } from "@/lib/format";
 
 /*
  * Match detail — DESIGN.md spec:
- *   • scoreboard at the top
+ *   • scoreboard at the top (each side: avatar + name)
  *   • status banner with auto-verify countdown
  *   • approve/dispute controls when the viewer is a pending participant
  *   • per-participant rating change rows (pre → post + delta pill)
  *   • report button → ReportModal
  *
- * Player names are fetched per participant via parallel `getPlayer`
- * queries. With the mock there are at most four participants per match;
- * Phase 9 will swap to a batch endpoint if the real backend supports it.
+ * Participant names + avatars come straight off the match payload now, so
+ * no per-player lookups are needed.
  */
 export function MatchDetailView({ matchId }: { matchId: number }) {
   const qc = useQueryClient();
@@ -42,19 +40,6 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
     queryFn: () => getMatch(matchId),
   });
   const meQ = useQuery({ queryKey: ["me"], queryFn: getMe });
-
-  const participantIds = matchQ.data?.participants.map((p) => p.player_id) ?? [];
-  const playerQs = useQueries({
-    queries: participantIds.map((id) => ({
-      queryKey: ["player", id],
-      queryFn: () => getPlayer(id),
-      enabled: matchQ.isSuccess,
-    })),
-  });
-  const playerNameById = (id: number): string => {
-    const found = playerQs.find((q) => q.data?.id === id)?.data;
-    return found?.display_name ?? found?.name ?? `Player #${id}`;
-  };
 
   const validate = useMutation({
     mutationFn: (action: "approved" | "disputed") =>
@@ -102,11 +87,7 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
 
       {/* Scoreboard */}
       <section className="mt-5 grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-xl border border-border bg-surface p-5 shadow-elevation-1">
-        <Side
-          label="Team A"
-          names={teamA.map((p) => playerNameById(p.player_id))}
-          won={winnerSide === "A"}
-        />
+        <Side label="Team A" players={teamA} won={winnerSide === "A"} />
         <div className="text-center">
           <p className="text-display-lg">
             {match.team_a_score}
@@ -114,12 +95,7 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
             {match.team_b_score}
           </p>
         </div>
-        <Side
-          label="Team B"
-          names={teamB.map((p) => playerNameById(p.player_id))}
-          won={winnerSide === "B"}
-          align="right"
-        />
+        <Side label="Team B" players={teamB} won={winnerSide === "B"} align="right" />
       </section>
 
       {/* Status */}
@@ -168,9 +144,10 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
               </span>
               <Link
                 href={`/players/${p.player_id}`}
-                className="truncate text-body-md hover:underline"
+                className="flex min-w-0 items-center gap-2 hover:underline"
               >
-                {playerNameById(p.player_id)}
+                <Avatar src={p.avatar_url} name={p.name} size={28} />
+                <span className="truncate text-body-md">{p.name}</span>
               </Link>
               <span className="text-caption text-text-secondary tabular-nums">
                 {formatPrePost(p)}
@@ -215,12 +192,12 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
 
 function Side({
   label,
-  names,
+  players,
   won,
   align = "left",
 }: {
   label: string;
-  names: string[];
+  players: MatchParticipant[];
   won: boolean;
   align?: "left" | "right";
 }) {
@@ -234,13 +211,20 @@ function Side({
       >
         {label} {won ? "· won" : ""}
       </p>
-      <ul className="space-y-0.5">
-        {names.length === 0 ? (
+      <ul className="space-y-1">
+        {players.length === 0 ? (
           <li className="truncate text-body-md text-text-muted">…</li>
         ) : (
-          names.map((n) => (
-            <li key={n} className="truncate text-body-md">
-              {n}
+          players.map((p) => (
+            <li
+              key={p.player_id}
+              className={cn(
+                "flex min-w-0 items-center gap-2",
+                align === "right" && "flex-row-reverse",
+              )}
+            >
+              <Avatar src={p.avatar_url} name={p.name} size={28} />
+              <span className="truncate text-body-md">{p.name}</span>
             </li>
           ))
         )}

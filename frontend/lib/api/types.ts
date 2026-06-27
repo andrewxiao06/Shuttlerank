@@ -189,6 +189,8 @@ export type CategoryMatchCreate = z.infer<typeof CategoryMatchCreateSchema>;
 export const MatchParticipantSchema = z.object({
   player_id: z.number().int(),
   team: z.enum(["A", "B"]),
+  name: z.string().default(""),
+  avatar_url: z.string().nullable().optional(),
   pre_r: z.number(),
   post_r: z.number(),
   delta_r: z.number(),

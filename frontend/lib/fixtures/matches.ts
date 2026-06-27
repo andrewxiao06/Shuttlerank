@@ -1,4 +1,13 @@
 import type { CategoryMatch, RatingCategory } from "../api/types";
+import { findPlayer } from "./players";
+
+function pName(pid: number): string {
+  const p = findPlayer(pid);
+  return p?.display_name ?? p?.name ?? `Player #${pid}`;
+}
+function pAvatar(pid: number): string | null {
+  return findPlayer(pid)?.avatar_url ?? null;
+}
 
 function match(
   id: number,
@@ -39,6 +48,8 @@ function match(
       ...a.map((pid) => ({
         player_id: pid,
         team: "A" as const,
+        name: pName(pid),
+        avatar_url: pAvatar(pid),
         pre_r: pre[pid],
         post_r: pre[pid] + deltas[pid],
         delta_r: deltas[pid],
@@ -49,6 +60,8 @@ function match(
       ...b.map((pid) => ({
         player_id: pid,
         team: "B" as const,
+        name: pName(pid),
+        avatar_url: pAvatar(pid),
         pre_r: pre[pid],
         post_r: pre[pid] + deltas[pid],
         delta_r: deltas[pid],

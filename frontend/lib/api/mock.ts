@@ -147,6 +147,8 @@ export async function createMatch(body: CategoryMatchCreate): Promise<CategoryMa
       ...body.team_a_player_ids.map((pid) => ({
         player_id: pid,
         team: "A" as const,
+        name: nameFor(pid),
+        avatar_url: avatarFor(pid),
         pre_r: ratingFor(pid),
         post_r: ratingFor(pid),
         delta_r: 0,
@@ -157,6 +159,8 @@ export async function createMatch(body: CategoryMatchCreate): Promise<CategoryMa
       ...body.team_b_player_ids.map((pid) => ({
         player_id: pid,
         team: "B" as const,
+        name: nameFor(pid),
+        avatar_url: avatarFor(pid),
         pre_r: ratingFor(pid),
         post_r: ratingFor(pid),
         delta_r: 0,
@@ -172,6 +176,13 @@ export async function createMatch(body: CategoryMatchCreate): Promise<CategoryMa
 
 function ratingFor(playerId: number): number {
   return findPlayer(playerId)?.ratings[0]?.display ?? 4.0;
+}
+function nameFor(playerId: number): string {
+  const p = findPlayer(playerId);
+  return p?.display_name ?? p?.name ?? `Player #${playerId}`;
+}
+function avatarFor(playerId: number): string | null {
+  return findPlayer(playerId)?.avatar_url ?? null;
 }
 
 export async function listPendingForMe(): Promise<CategoryMatch[]> {

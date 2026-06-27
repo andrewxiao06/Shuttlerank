@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { Avatar } from "./ui/Avatar";
 import { Card } from "./ui/Card";
 import { AsyncBoundary } from "./ui/AsyncBoundary";
+import { MatchRow } from "./MatchRow";
 import { getPlayer, listPlayerMatches } from "../lib/api/client";
 import { formatRating, tierLabel, isCalibrating } from "../lib/format";
 import type { CategoryMatch, PlayerMe } from "../lib/api/types";
@@ -179,45 +179,3 @@ function Body({
   );
 }
 
-function MatchRow({ match, viewerId }: { match: CategoryMatch; viewerId: number }) {
-  const router = useRouter();
-  const me = match.participants.find((p) => p.player_id === viewerId);
-  const youWon = me?.team === match.winner_team;
-  const verified = match.status === "verified";
-  const delta = me?.delta_display ?? 0;
-
-  return (
-    <Pressable onPress={() => router.push(`/match/${match.id}`)}>
-      <Card style={{ flexDirection: "row", alignItems: "center", padding: spacing.md }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.text, fontWeight: "600" }}>
-            {match.participants.length > 2 ? "Doubles" : "Singles"} · {match.played_at}
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: verified ? (youWon ? colors.accent : colors.danger) : colors.warning,
-            }}
-          >
-            {verified ? (youWon ? "Won" : "Lost") : "Pending"}
-          </Text>
-        </View>
-        <Text style={{ color: colors.text, fontWeight: "700" }}>
-          {match.team_a_score}–{match.team_b_score}
-        </Text>
-        {verified ? (
-          <Text
-            style={{
-              marginLeft: spacing.md,
-              color: delta > 0 ? colors.accent : delta < 0 ? colors.danger : colors.textMuted,
-              fontWeight: "700",
-            }}
-          >
-            {delta > 0 ? "+" : delta < 0 ? "−" : "±"}
-            {Math.abs(delta).toFixed(1)}
-          </Text>
-        ) : null}
-      </Card>
-    </Pressable>
-  );
-}
