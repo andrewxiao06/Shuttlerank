@@ -1,46 +1,38 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { type CategoryMatch } from "@/lib/api/types";
+import { type CategoryMatch, type MatchParticipant } from "@/lib/api/types";
+import { Avatar } from "@/components/player/Avatar";
 import { DeltaPill } from "./DeltaPill";
 
 /*
- * Match row — DESIGN.md spec:
+ * Match row — shows both sides at a glance: each team's players (avatar +
+ * name), the score, and the viewer's rating delta. Reads names/avatars
+ * straight off the participants (the API now includes them), so no extra
+ * lookups are needed.
  *
- *   A. Xiao   vs   J. Patel       21-15 21-18
- *   Gold II        Silver III      2 days ago
- *                                         +0.041
- *
- * On mobile (<sm) the score moves under the names → two-line layout.
- *
- * PLAN.md debugging hook: "Match row shows wrong delta" → viewerId must
- * locate the participant where `player_id === viewerId`. That's enforced
- * here; rows without a viewer participant fall back to the team-A delta.
+ * The viewer's team is shown on the left so "you vs them" reads naturally.
  */
 export function MatchRow({
   match,
   viewerId,
-  opponentName,
   href,
   className,
 }: {
   match: CategoryMatch;
   viewerId: number;
-  opponentName?: string;
   href?: string;
   className?: string;
 }) {
   const viewer = match.participants.find((p) => p.player_id === viewerId);
-  const opp = match.participants.find(
-    (p) => p.team !== (viewer?.team ?? "A") && p.player_id !== viewerId,
-  );
-  const oppRating = opp?.post_display;
-  const youWon = viewer?.team === match.winner_team;
+  const mySide = viewer?.team ?? "A";
+  const mine = match.participants.filter((p) => p.team === mySide);
+  const theirs = match.participants.filter((p) => p.team !== mySide);
 
+  const myScore = mySide === "A" ? match.team_a_score : match.team_b_score;
+  const theirScore = mySide === "A" ? match.team_b_score : match.team_a_score;
+  const youWon = viewer?.team === match.winner_team;
+  const verified = match.status === "verified";
   const ago = relativeTime(match.played_at);
-  const score =
-    viewer?.team === "B"
-      ? `${match.team_b_score}-${match.team_a_score}`
-      : `${match.team_a_score}-${match.team_b_score}`;
 
   const inner = (
     <div
@@ -50,36 +42,32 @@ export function MatchRow({
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex items-baseline gap-2">
-            <p className="truncate text-body-md font-semibold">
-              {opponentName ?? `Player #${opp?.player_id ?? "?"}`}
-            </p>
-            <span
-              className={cn(
-                "text-label uppercase",
-                youWon ? "text-accent" : "text-danger",
-              )}
-            >
-              {youWon ? "Won" : "Lost"}
-            </span>
-          </div>
-          <p className="text-caption text-text-secondary">
-            {match.participants.length > 2 ? "Doubles" : "Singles"} · {ago}
-            {oppRating != null ? ` · vs ${oppRating.toFixed(1)}` : ""}
-          </p>
+      <div className="flex items-center justify-between text-caption text-text-secondary">
+        <span>
+          {match.participants.length > 2 ? "Doubles" : "Singles"} · {ago}
+        </span>
+        {verified ? (
+          <span className={cn(youWon ? "text-accent" : "text-danger")}>
+            {youWon ? "Won" : "Lost"}
+          </span>
+        ) : (
+          <span className="rounded-full bg-warning-soft px-2 py-0.5 text-label uppercase text-warning">
+            Pending
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Side players={mine} />
+        <div className="flex shrink-0 flex-col items-center">
+          <span className="text-numeral-md tabular-nums">
+            {myScore}
+            <span className="px-1 text-text-muted">–</span>
+            {theirScore}
+          </span>
+          {verified ? <DeltaPill delta={viewer?.delta_display ?? 0} /> : null}
         </div>
-        <div className="flex flex-col items-end gap-1">
-          <p className="text-numeral-md">{score}</p>
-          {match.status === "verified" ? (
-            <DeltaPill delta={viewer?.delta_r ?? 0} />
-          ) : (
-            <span className="rounded-full bg-warning-soft px-2.5 py-1 text-label uppercase text-warning">
-              Pending
-            </span>
-          )}
-        </div>
+        <Side players={theirs} align="right" />
       </div>
     </div>
   );
@@ -87,10 +75,34 @@ export function MatchRow({
   return href ? <Link href={href}>{inner}</Link> : inner;
 }
 
+function Side({
+  players,
+  align = "left",
+}: {
+  players: MatchParticipant[];
+  align?: "left" | "right";
+}) {
+  return (
+    <div className={cn("min-w-0 flex-1 space-y-1", align === "right" && "items-end")}>
+      {players.map((p) => (
+        <div
+          key={p.player_id}
+          className={cn(
+            "flex min-w-0 items-center gap-2",
+            align === "right" && "flex-row-reverse",
+          )}
+        >
+          <Avatar src={p.avatar_url} name={p.name} size={28} />
+          <span className="truncate text-body-md">{p.name}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
-  const now = Date.now();
-  const days = Math.round((now - then) / (1000 * 60 * 60 * 24));
+  const days = Math.round((Date.now() - then) / (1000 * 60 * 60 * 24));
   if (days <= 0) return "today";
   if (days === 1) return "yesterday";
   if (days < 7) return `${days} days ago`;
@@ -98,4 +110,3 @@ function relativeTime(iso: string): string {
   if (days < 365) return `${Math.round(days / 30)}mo ago`;
   return `${Math.round(days / 365)}y ago`;
 }
-

@@ -109,6 +109,9 @@ class MatchParticipantOut(BaseModel):
 
     player_id: int
     team: str
+    # Identity so match rows/detail show who played at a glance.
+    name: str = ""
+    avatar_url: Optional[str] = None
     # Internal Glicko values stay in the payload for completeness, but the
     # frontend renders only the *_display fields (2.0–8.0 scale).
     pre_r: float

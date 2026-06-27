@@ -1,21 +1,17 @@
 import {
   useMutation,
-  useQueries,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
+import { Avatar } from "../../../components/ui/Avatar";
 import { Button } from "../../../components/ui/Button";
 import { Card } from "../../../components/ui/Card";
 import { Screen } from "../../../components/ui/Screen";
 import { AsyncBoundary } from "../../../components/ui/AsyncBoundary";
-import {
-  getPlayer,
-  listPendingForMe,
-  validateMatch,
-} from "../../../lib/api/client";
-import type { CategoryMatch } from "../../../lib/api/types";
+import { listPendingForMe, validateMatch } from "../../../lib/api/client";
+import type { CategoryMatch, MatchParticipant } from "../../../lib/api/types";
 import { colors, spacing } from "../../../lib/theme";
 
 /*
@@ -29,21 +25,6 @@ export default function Inbox() {
   // Collect every participant id across all pending matches, then look up
   // their names once (in parallel) so cards can show real names, not #ids.
   const pending = q.data ?? [];
-  const ids = Array.from(
-    new Set(pending.flatMap((m) => m.participants.map((p) => p.player_id))),
-  );
-  const playerQueries = useQueries({
-    queries: ids.map((id) => ({
-      queryKey: ["player", id],
-      queryFn: () => getPlayer(id),
-      enabled: q.isSuccess,
-    })),
-  });
-  const nameOf = (id: number) => {
-    const p = playerQueries.find((pq) => pq.data?.id === id)?.data;
-    return p?.display_name ?? p?.name ?? `Player #${id}`;
-  };
-
   return (
     <Screen padded={false}>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
@@ -76,22 +57,14 @@ export default function Inbox() {
               All caught up — nothing to approve.
             </Text>
           }
-          renderItem={({ item }) => (
-            <PendingCard match={item} nameOf={nameOf} />
-          )}
+          renderItem={({ item }) => <PendingCard match={item} />}
         />
       </AsyncBoundary>
     </Screen>
   );
 }
 
-function PendingCard({
-  match,
-  nameOf,
-}: {
-  match: CategoryMatch;
-  nameOf: (id: number) => string;
-}) {
+function PendingCard({ match }: { match: CategoryMatch }) {
   const qc = useQueryClient();
   const router = useRouter();
 
@@ -118,17 +91,13 @@ function PendingCard({
       {/* Scoreboard — tap to see full detail */}
       <Pressable
         onPress={() => router.push(`/match/${match.id}`)}
-        style={{ flexDirection: "row", alignItems: "center" }}
+        style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}
       >
-        <Text style={{ flex: 1, color: colors.text }}>
-          {teamA.map((p) => nameOf(p.player_id)).join(" & ")}
-        </Text>
+        <InboxSide players={teamA} />
         <Text style={{ fontSize: 22, fontWeight: "800", color: colors.text }}>
-          {match.team_a_score} – {match.team_b_score}
+          {match.team_a_score}–{match.team_b_score}
         </Text>
-        <Text style={{ flex: 1, textAlign: "right", color: colors.text }}>
-          {teamB.map((p) => nameOf(p.player_id)).join(" & ")}
-        </Text>
+        <InboxSide players={teamB} align="right" />
       </Pressable>
 
       {act.isError ? (
@@ -158,5 +127,33 @@ function PendingCard({
         </View>
       </View>
     </Card>
+  );
+}
+
+function InboxSide({
+  players,
+  align = "left",
+}: {
+  players: MatchParticipant[];
+  align?: "left" | "right";
+}) {
+  return (
+    <View style={{ flex: 1, gap: 4 }}>
+      {players.map((p) => (
+        <View
+          key={p.player_id}
+          style={{
+            flexDirection: align === "right" ? "row-reverse" : "row",
+            alignItems: "center",
+            gap: spacing.xs,
+          }}
+        >
+          <Avatar src={p.avatar_url} name={p.name} size={24} />
+          <Text numberOfLines={1} style={{ flexShrink: 1, color: colors.text, fontSize: 13 }}>
+            {p.name}
+          </Text>
+        </View>
+      ))}
+    </View>
   );
 }

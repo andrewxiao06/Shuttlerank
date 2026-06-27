@@ -23,7 +23,7 @@ from badminton_rating.api.models.v1 import (
     TournamentEntryOut,
     TournamentOut,
 )
-from badminton_rating.api.routes.v1_matches import _match_to_out
+from badminton_rating.api.routes.v1_matches import _load_match_or_404, _match_to_out
 from badminton_rating.db.models import (
     Match,
     MatchPlayer,
@@ -320,9 +320,10 @@ async def generate_pairings(
         t.status = TournamentStatus.IN_PROGRESS
 
     await session.commit()
-    for m in created:
-        await session.refresh(m, attribute_names=["participants"])
-    return PairingsOut(matches=[_match_to_out(m) for m in created])
+    # Reload each with participants' player rows eager-loaded so the response
+    # carries names/avatars (and avoids async lazy-load on p.player).
+    reloaded = [await _load_match_or_404(session, m.id) for m in created]
+    return PairingsOut(matches=[_match_to_out(m) for m in reloaded])
 
 
 # ---------------------------------------------------------------------------

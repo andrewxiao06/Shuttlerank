@@ -66,27 +66,34 @@ export default function EditProfile() {
     },
   });
 
+  const [photoError, setPhotoError] = useState<string | null>(null);
+
   async function pickPhoto() {
     if (!user) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) return;
+    if (!perm.granted) {
+      setPhotoError("Photo permission denied — enable it in Settings.");
+      return;
+    }
     const res = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.6,
-      base64: true,
     });
-    if (res.canceled || !res.assets[0]?.base64) return;
+    if (res.canceled || !res.assets[0]?.uri) return;
     setPhotoBusy(true);
+    setPhotoError(null);
     try {
-      const dataUri = `data:image/jpeg;base64,${res.assets[0].base64}`;
-      await user.setProfileImage({ file: dataUri });
+      // Clerk accepts a Blob; fetch the picked file URI into one.
+      const blob = await (await fetch(res.assets[0].uri)).blob();
+      await user.setProfileImage({ file: blob });
+      await user.reload();
       await patchMe({ avatar_url: user.imageUrl });
       setAvatar(user.imageUrl);
       await qc.invalidateQueries({ queryKey: ["me"] });
-    } catch {
-      /* leave the button available to retry */
+    } catch (e) {
+      setPhotoError((e as Error)?.message ?? "Couldn't upload photo.");
     } finally {
       setPhotoBusy(false);
     }
@@ -106,6 +113,11 @@ export default function EditProfile() {
               {photoBusy ? "Uploading…" : "Change photo"}
             </Text>
           </Pressable>
+          {photoError ? (
+            <Text style={{ color: colors.danger, fontSize: 12, textAlign: "center" }}>
+              {photoError}
+            </Text>
+          ) : null}
         </View>
 
         <Field label="Display name">

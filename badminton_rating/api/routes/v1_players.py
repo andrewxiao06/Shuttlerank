@@ -152,7 +152,7 @@ async def list_player_matches(
         select(Match)
         .join(MatchPlayer, MatchPlayer.match_id == Match.id)
         .where(MatchPlayer.player_id == player_id)
-        .options(selectinload(Match.participants))
+        .options(selectinload(Match.participants).selectinload(MatchPlayer.player))
         .order_by(Match.played_at.desc(), Match.id.desc())
         .limit(limit)
     )
