@@ -1,9 +1,11 @@
+import { useState } from "react";
 import { Image, Text, View } from "react-native";
 import { colors } from "../../lib/theme";
 
 /*
- * Player avatar — the profile photo when present, else a monogram circle
- * (the profile picture is optional, like DUPR).
+ * Player avatar — the profile photo when present and loadable, else a
+ * monogram circle. Falls back to the monogram on image load error too, so a
+ * stale/expired URL degrades gracefully instead of showing nothing.
  */
 export function Avatar({
   src,
@@ -14,14 +16,21 @@ export function Avatar({
   name?: string | null;
   size?: number;
 }) {
+  const [failed, setFailed] = useState(false);
   const initial = (name ?? "?").trim().charAt(0).toUpperCase() || "?";
   const radius = size / 2;
 
-  if (src) {
+  if (src && !failed) {
     return (
       <Image
         source={{ uri: src }}
-        style={{ width: size, height: size, borderRadius: radius, backgroundColor: colors.surfaceMuted }}
+        onError={() => setFailed(true)}
+        style={{
+          width: size,
+          height: size,
+          borderRadius: radius,
+          backgroundColor: colors.surfaceMuted,
+        }}
       />
     );
   }

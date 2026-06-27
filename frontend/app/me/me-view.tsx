@@ -103,8 +103,12 @@ export function MeSettingsView() {
     setPhotoBusy(true);
     try {
       await user.setProfileImage({ file });
+      // Reload so user.imageUrl is the FRESH url (Clerk rotates it on change),
+      // then persist it and refresh everything that shows an avatar — match
+      // rows embed the url too, so a "me"-only invalidation leaves them stale.
+      await user.reload();
       await patchMe({ avatar_url: user.imageUrl });
-      await qc.invalidateQueries({ queryKey: ["me"] });
+      await qc.invalidateQueries();
     } catch {
       /* surfaced via the photo button staying available */
     } finally {

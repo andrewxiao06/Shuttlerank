@@ -21,7 +21,7 @@ const TABS: readonly Tab[] = [
   { href: "/leaderboard", label: "Board", icon: "☷" },
   { href: "/matches/new", label: "Submit", icon: "+", fab: true },
   { href: "/inbox", label: "Inbox", icon: "⚑" },
-  { href: "/players/1", label: "Profile", icon: "◉" },
+  { href: "/me", label: "Profile", icon: "◉" },
 ];
 
 export function MobileTabBar() {
