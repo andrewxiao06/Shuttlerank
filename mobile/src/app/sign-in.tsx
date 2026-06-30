@@ -34,10 +34,6 @@ export default function SignIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Once authenticated, leave the sign-in screen for the app. Handles both
-  // a fresh sign-in and the "already signed in" case.
-  if (isLoaded && isSignedIn) return <Redirect href="/" />;
-
   const onGoogle = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -56,6 +52,12 @@ export default function SignIn() {
       setBusy(false);
     }
   }, [startSSOFlow]);
+
+  // Once authenticated, leave the sign-in screen for the app. Handles both a
+  // fresh sign-in and the "already signed in" case. MUST come after every
+  // hook above — an early return before a hook changes the hook count and
+  // crashes with "rendered fewer hooks than expected".
+  if (isLoaded && isSignedIn) return <Redirect href="/" />;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
