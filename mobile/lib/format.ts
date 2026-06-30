@@ -21,23 +21,27 @@ export function formatPercent(p: number | null | undefined, digits = 0): string 
   return `${(p * 100).toFixed(digits)}%`;
 }
 
-/** Tier label from a display rating (2.0–8.0). Matches the web tier bands. */
+/**
+ * Tier label from a display rating. 1=Bronze, 2=Silver, 3=Gold, 4=Platinum,
+ * 5=Diamond, 6+=Master; each tier split into 5 sub-divisions of 0.2
+ * (1.0=Bronze 1, 1.2=Bronze 2, … 2.4=Silver 3). Mirrors the web tier.ts.
+ */
+const BAND_NAMES: Record<number, string> = {
+  1: "Bronze",
+  2: "Silver",
+  3: "Gold",
+  4: "Platinum",
+  5: "Diamond",
+  6: "Master",
+};
+
 export function tierLabel(rating: number | null | undefined): string {
   if (rating == null || Number.isNaN(rating)) return "Unrated";
-  const bands: [number, string][] = [
-    [7.0, "Master"],
-    [6.0, "Diamond"],
-    [5.0, "Platinum"],
-    [4.0, "Gold"],
-    [3.0, "Silver"],
-    [2.0, "Bronze"],
-  ];
-  const clamped = Math.max(2.0, Math.min(7.999, rating));
-  const band = bands.find(([min]) => clamped >= min);
-  if (!band) return "Bronze";
-  const within = clamped - band[0];
-  const sub = within < 0.333 ? "I" : within < 0.667 ? "II" : "III";
-  return `${band[1]} ${sub}`;
+  const band = Math.max(1, Math.min(6, Math.floor(rating)));
+  const name = BAND_NAMES[band] ?? "Master";
+  // +1e-6 absorbs float error so 1.2 → sub 2 (not 1).
+  const sub = Math.min(5, Math.max(1, Math.floor((rating - band) / 0.2 + 1e-6) + 1));
+  return `${name} ${sub}`;
 }
 
 /** True when the rating is still calibrating (high uncertainty). */

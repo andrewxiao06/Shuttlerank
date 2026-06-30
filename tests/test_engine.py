@@ -37,7 +37,8 @@ def test_to_display_rating_midpoint():
 
 
 def test_to_display_rating_clamps_low():
-    assert to_display_rating(0) == 2.0
+    # Floor is now 1.0 (Bronze 1) so low ratings are reachable.
+    assert to_display_rating(0) == 1.0
 
 
 def test_to_display_rating_clamps_high():
@@ -45,19 +46,25 @@ def test_to_display_rating_clamps_high():
 
 
 # ---------------------------------------------------------------------------
-# Tier labels
+# Tier labels — 1=Bronze, 2=Silver, 3=Gold, 4=Platinum, 5=Diamond,
+# each split into 5 sub-divisions of 0.2.
 # ---------------------------------------------------------------------------
 
 def test_tier_bronze():
-    assert "Bronze" in get_tier(2.3)
+    assert get_tier(1.0) == "Bronze 1"
+    assert get_tier(1.4) == "Bronze 3"
+
+
+def test_tier_silver():
+    assert get_tier(2.4) == "Silver 3"
 
 
 def test_tier_gold():
-    assert "Gold" in get_tier(4.5)
+    assert get_tier(3.0) == "Gold 1"
 
 
-def test_tier_master():
-    assert "Master" in get_tier(7.8)
+def test_tier_diamond():
+    assert get_tier(5.0) == "Diamond 1"
 
 
 # ---------------------------------------------------------------------------

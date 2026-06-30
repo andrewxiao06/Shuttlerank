@@ -5,10 +5,10 @@ import { cn } from "@/lib/utils";
  * (display ≥ ceiling) renders a full bar in `warning` with the unlock
  * prompt; this is the integrity story called out in PLAN.md item 5.
  *
- * Bottom is hard-coded to 2.0 (the DUPR-style scale floor in CLAUDE.md),
- * so the bar fills from "raw beginner" → "ceiling", not from 0.
+ * Bottom is hard-coded to 1.0 (Bronze 1, the scale floor), so the bar fills
+ * from "raw beginner" → "ceiling", not from 0.
  */
-const SCALE_FLOOR = 2.0;
+const SCALE_FLOOR = 1.0;
 
 export function CeilingBar({
   display,

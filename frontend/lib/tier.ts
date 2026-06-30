@@ -14,52 +14,52 @@ export type TierName =
   | "diamond"
   | "master";
 
-export type SubTier = "I" | "II" | "III";
+/** Sub-division within a tier: 1–5 (one per 0.2 of rating). */
+export type SubTier = 1 | 2 | 3 | 4 | 5;
 
 export interface TierInfo {
   name: TierName;
-  /** Display label, e.g. "Gold II" */
+  /** Display label, e.g. "Gold 3" */
   label: string;
-  /** Bronze..Master subtier */
   sub: SubTier;
   /** Tailwind color token suffix — pair with `bg-tier-…` / `text-tier-…` / `border-tier-…` */
   colorToken: `tier-${TierName}`;
 }
 
-const TIERS: { name: TierName; min: number }[] = [
-  { name: "bronze", min: 2.0 },
-  { name: "silver", min: 3.0 },
-  { name: "gold", min: 4.0 },
-  { name: "platinum", min: 5.0 },
-  { name: "diamond", min: 6.0 },
-  { name: "master", min: 7.0 },
-];
+// Tier keyed by the integer part of the rating: 1=Bronze … 5=Diamond,
+// 6+=Master (future competitive). Each tier spans 1.0, split into 5
+// sub-divisions of 0.2 (1.0=Bronze 1, 1.2=Bronze 2, … 2.4=Silver 3).
+const BAND_NAMES: Record<number, TierName> = {
+  1: "bronze",
+  2: "silver",
+  3: "gold",
+  4: "platinum",
+  5: "diamond",
+  6: "master",
+};
 
 const UNKNOWN: TierInfo = {
   name: "bronze",
   label: "Unrated",
-  sub: "I",
+  sub: 1,
   colorToken: "tier-bronze",
 };
 
 export function tierFor(rating: number | null | undefined): TierInfo {
   if (rating == null || Number.isNaN(rating)) return UNKNOWN;
 
-  // Match CLAUDE.md: 2.0–3.0 Bronze, etc. Clamp above 8.0 into Master III.
-  const clamped = Math.max(2.0, Math.min(7.999, rating));
-  const tier =
-    [...TIERS].reverse().find((t) => clamped >= t.min) ?? TIERS[0];
+  const band = Math.max(1, Math.min(6, Math.floor(rating)));
+  const name = BAND_NAMES[band] ?? "master";
+  // +1e-6 absorbs float error so 1.2 → sub 2 (not 1).
+  const sub = Math.min(5, Math.max(1, Math.floor((rating - band) / 0.2 + 1e-6) + 1)) as SubTier;
 
-  const within = clamped - tier.min; // 0..1
-  const sub: SubTier = within < 0.333 ? "I" : within < 0.667 ? "II" : "III";
-
-  const label = `${tier.name[0].toUpperCase()}${tier.name.slice(1)} ${sub}`;
+  const label = `${name[0].toUpperCase()}${name.slice(1)} ${sub}`;
 
   return {
-    name: tier.name,
+    name,
     label,
     sub,
-    colorToken: `tier-${tier.name}` as const,
+    colorToken: `tier-${name}` as const,
   };
 }
 

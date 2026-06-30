@@ -68,8 +68,7 @@ async def test_create_and_get_player(client):
     created = await _make_player(client, "Andrew")
     assert created["name"] == "Andrew"
     assert created["singles"]["display"] == 5.0
-    assert created["singles"]["tier"].startswith("Platinum") or \
-           created["singles"]["tier"].startswith("Gold")
+    assert created["singles"]["tier"].startswith("Diamond")
     assert created["singles"]["calibrating"] is True
     assert created["singles"]["match_count"] == 0
 

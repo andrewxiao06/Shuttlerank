@@ -259,9 +259,9 @@ class Player(Base):
 # ---------------------------------------------------------------------------
 
 # Casual ceiling: the highest display rating reachable through normal
-# (non-tournament) play. Ranked tournaments + admin overrides raise it above
-# this; nobody climbs past 4.5 casually.
-INITIAL_CEILING = 4.5
+# (non-tournament) play. 5.0 = Diamond; competitive (above 5.0) comes later.
+# Ranked tournaments + admin overrides can raise it above this.
+INITIAL_CEILING = 5.0
 
 # Self-pick: new players choose a starting level instead of being dropped at
 # the cap. They can pick 1.0–4.5; 5.0+ is gated behind ranked tournaments /
