@@ -501,6 +501,14 @@ class Tournament(Base):
     ends_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Registration auto-closes once this passes (null = stays open until the
+    # organizer generates pairings). Enforced lazily at sign-up time.
+    registration_closes_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    # Optional entry gates on the 1.0–5.0 display rating (null = no bound).
+    min_rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    max_rating: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     organizer_user_id: Mapped[Optional[str]] = mapped_column(
         String(64), nullable=True, index=True
     )

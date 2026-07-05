@@ -79,6 +79,9 @@ def _to_out(t: Tournament) -> TournamentOut:
         ranked=t.ranked,
         starts_at=t.starts_at,
         ends_at=t.ends_at,
+        registration_closes_at=t.registration_closes_at,
+        min_rating=t.min_rating,
+        max_rating=t.max_rating,
         status=t.status,
         organizer_user_id=t.organizer_user_id,
         entries=[TournamentEntryOut.model_validate(e) for e in t.entries],
@@ -128,12 +131,24 @@ async def create_tournament(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="only administrators can host ranked tournaments",
         )
+    if (
+        payload.min_rating is not None
+        and payload.max_rating is not None
+        and payload.min_rating > payload.max_rating
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="min_rating cannot exceed max_rating",
+        )
     t = Tournament(
         name=payload.name,
         format=payload.format,
         ranked=payload.ranked,
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
+        registration_closes_at=payload.registration_closes_at,
+        min_rating=payload.min_rating,
+        max_rating=payload.max_rating,
         status=TournamentStatus.DRAFT,
         organizer_user_id=player.clerk_user_id,
     )
@@ -176,15 +191,56 @@ async def signup(
             status_code=status.HTTP_409_CONFLICT,
             detail="registration is closed",
         )
+    # Registration auto-closes at the deadline, even while the tournament is
+    # still in draft/open — a lazy check so no background job is needed.
+    if (
+        t.registration_closes_at is not None
+        and datetime.now(timezone.utc) >= t.registration_closes_at
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="registration has closed",
+        )
+
+    # Rating gate — the player's current display rating must fall within the
+    # tournament's [min, max] window. Unrated players seed at display 4.0
+    # (matches pairing / new-rating defaults).
+    if t.min_rating is not None or t.max_rating is not None:
+        row = (await session.execute(
+            select(PlayerCategoryRating).where(
+                PlayerCategoryRating.player_id == player.id,
+                PlayerCategoryRating.category == RatingCategory.OVERALL,
+            )
+        )).scalar_one_or_none()
+        display = to_display_rating(row.r) if row else 4.0
+        if t.min_rating is not None and display < t.min_rating:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"your rating {display:.1f} is below the {t.min_rating:.1f} minimum",
+            )
+        if t.max_rating is not None and display > t.max_rating:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"your rating {display:.1f} is above the {t.max_rating:.1f} maximum",
+            )
+
     existing = next(
-        (e for e in t.entries if e.player_id == player.id and not e.withdrawn),
+        (e for e in t.entries if e.player_id == player.id),
         None,
     )
-    if existing is not None:
+    if existing is not None and not existing.withdrawn:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="already entered",
         )
+    if existing is not None:
+        # Re-entering after a withdrawal: reactivate the row rather than
+        # inserting a duplicate (the (tournament, player) pair is unique).
+        existing.withdrawn = False
+        await session.commit()
+        await session.refresh(existing)
+        return TournamentEntryOut.model_validate(existing)
+
     entry = TournamentEntry(tournament_id=t.id, player_id=player.id)
     session.add(entry)
     await session.commit()

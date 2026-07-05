@@ -32,8 +32,12 @@ export function TournamentDetailView({ tournamentId }: { tournamentId: number })
   });
   const meQ = useQuery({ queryKey: ["me"], queryFn: getMe });
 
-  const refetch = () =>
+  const refetch = () => {
     qc.invalidateQueries({ queryKey: ["tournament", tournamentId] });
+    // The browse list caches its own entrant counts — refresh it too so the
+    // count there matches after a sign-up / withdrawal.
+    qc.invalidateQueries({ queryKey: ["tournaments"] });
+  };
 
   const enter = useMutation({
     mutationFn: () => enterTournament(tournamentId),
@@ -69,8 +73,19 @@ export function TournamentDetailView({ tournamentId }: { tournamentId: number })
     meQ.data?.clerk_user_id != null &&
     t.organizer_user_id === meQ.data.clerk_user_id;
 
-  const canEnter = (t.status === "open" || t.status === "draft") && !myEntry;
-  const canWithdraw = !!myEntry && (t.status === "open" || t.status === "draft");
+  const registrationClosed =
+    t.registration_closes_at != null &&
+    Date.now() >= new Date(t.registration_closes_at).getTime();
+
+  const myDisplay = meQ.data?.ratings?.[0]?.display ?? null;
+  const belowMin = t.min_rating != null && myDisplay != null && myDisplay < t.min_rating;
+  const aboveMax = t.max_rating != null && myDisplay != null && myDisplay > t.max_rating;
+  const outOfRange = belowMin || aboveMax;
+
+  const registrationOpen =
+    (t.status === "open" || t.status === "draft") && !registrationClosed;
+  const canEnter = registrationOpen && !myEntry && !outOfRange;
+  const canWithdraw = !!myEntry && registrationOpen;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pb-24 pt-6 sm:px-6">
@@ -96,11 +111,39 @@ export function TournamentDetailView({ tournamentId }: { tournamentId: number })
         <StatusPill status={t.status} />
       </header>
 
+      {t.registration_closes_at != null || t.min_rating != null || t.max_rating != null ? (
+        <section className="mt-4 flex flex-wrap gap-x-6 gap-y-1 rounded-lg border border-border bg-surface-muted/40 p-4 text-caption text-text-secondary">
+          {t.registration_closes_at != null ? (
+            <p>
+              <span className="text-text-muted">Registration {registrationClosed ? "closed" : "closes"}:</span>{" "}
+              {new Date(t.registration_closes_at).toLocaleString()}
+            </p>
+          ) : null}
+          {t.min_rating != null || t.max_rating != null ? (
+            <p>
+              <span className="text-text-muted">Rating range:</span>{" "}
+              {t.min_rating != null ? t.min_rating.toFixed(1) : "any"} –{" "}
+              {t.max_rating != null ? t.max_rating.toFixed(1) : "any"}
+            </p>
+          ) : null}
+        </section>
+      ) : null}
+
       <section className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface p-4">
-        <p className="text-body-md">
-          {t.entries.filter((e) => !e.withdrawn).length} entrant
-          {t.entries.filter((e) => !e.withdrawn).length === 1 ? "" : "s"}
-        </p>
+        <div>
+          <p className="text-body-md">
+            {t.entries.filter((e) => !e.withdrawn).length} entrant
+            {t.entries.filter((e) => !e.withdrawn).length === 1 ? "" : "s"}
+          </p>
+          {!myEntry && registrationOpen && outOfRange ? (
+            <p className="mt-1 text-caption text-danger">
+              Your rating {myDisplay?.toFixed(1)} is {belowMin ? "below the minimum" : "above the maximum"} for this tournament.
+            </p>
+          ) : null}
+          {!myEntry && registrationClosed && (t.status === "open" || t.status === "draft") ? (
+            <p className="mt-1 text-caption text-text-muted">Registration has closed.</p>
+          ) : null}
+        </div>
         <div className="flex gap-2">
           {canEnter ? (
             <button
@@ -137,7 +180,10 @@ export function TournamentDetailView({ tournamentId }: { tournamentId: number })
           <div className="mt-3 flex gap-2">
             <button
               type="button"
-              disabled={generate.isPending || t.status !== "open"}
+              disabled={
+                generate.isPending ||
+                (t.status !== "draft" && t.status !== "open")
+              }
               onClick={() => generate.mutate()}
               className="h-11 rounded-md bg-primary px-4 text-body-md text-on-primary disabled:opacity-40"
             >
