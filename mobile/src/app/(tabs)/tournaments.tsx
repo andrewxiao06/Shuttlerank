@@ -7,7 +7,7 @@ import { AsyncBoundary } from "../../../components/ui/AsyncBoundary";
 import { RankedBadge, statusLabel } from "../../../components/tournament/TournamentBadge";
 import { listTournaments } from "../../../lib/api/client";
 import type { Tournament } from "../../../lib/api/types";
-import { colors, spacing } from "../../../lib/theme";
+import { colors, radius, spacing } from "../../../lib/theme";
 
 const STATUS_ORDER: Record<string, number> = {
   in_progress: 0,
@@ -30,11 +30,32 @@ export default function Tournaments() {
 
   return (
     <Screen padded={false}>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
-        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>
-          Tournaments
-        </Text>
-        <Text style={{ color: colors.textSecondary }}>Browse and enter events</Text>
+      <View
+        style={{
+          paddingHorizontal: spacing.lg,
+          paddingTop: spacing.lg,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <View>
+          <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>
+            Tournaments
+          </Text>
+          <Text style={{ color: colors.textSecondary }}>Browse and enter events</Text>
+        </View>
+        <Pressable
+          onPress={() => router.push("/tournaments/new")}
+          style={{
+            backgroundColor: colors.primary,
+            borderRadius: radius.md,
+            paddingVertical: spacing.sm,
+            paddingHorizontal: spacing.md,
+          }}
+        >
+          <Text style={{ color: colors.onPrimary, fontWeight: "700" }}>Host</Text>
+        </Pressable>
       </View>
 
       <AsyncBoundary

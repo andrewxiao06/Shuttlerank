@@ -49,7 +49,12 @@ export default function TournamentDetail() {
     return p?.display_name ?? p?.name ?? `Player #${pid}`;
   };
 
-  const refresh = () => qc.invalidateQueries({ queryKey: ["tournament", tid] });
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["tournament", tid] });
+    // The Tournaments tab caches its own entrant counts — refresh it too so
+    // the count there stays accurate after a sign-up / withdrawal.
+    qc.invalidateQueries({ queryKey: ["tournaments"] });
+  };
 
   const enter = useMutation({ mutationFn: () => enterTournament(tid), onSuccess: refresh });
   const withdraw = useMutation({ mutationFn: () => withdrawFromTournament(tid), onSuccess: refresh });
@@ -70,6 +75,7 @@ export default function TournamentDetail() {
               t={q.data}
               myId={meQ.data?.id}
               myClerkId={meQ.data?.clerk_user_id ?? null}
+              myDisplay={meQ.data?.ratings?.[0]?.display ?? null}
               nameOf={nameOf}
               enter={enter}
               withdraw={withdraw}
@@ -89,6 +95,7 @@ function Body({
   t,
   myId,
   myClerkId,
+  myDisplay,
   nameOf,
   enter,
   withdraw,
@@ -98,6 +105,7 @@ function Body({
   t: Tournament;
   myId?: number;
   myClerkId: string | null;
+  myDisplay: number | null;
   nameOf: (id: number) => string;
   enter: Mut;
   withdraw: Mut;
@@ -107,7 +115,15 @@ function Body({
   const active = t.entries.filter((e) => !e.withdrawn);
   const myEntry = myId != null && active.some((e) => e.player_id === myId);
   const isOrganizer = myClerkId != null && t.organizer_user_id === myClerkId;
-  const registrationOpen = t.status === "open" || t.status === "draft";
+  const deadlinePassed =
+    t.registration_closes_at != null &&
+    Date.now() >= new Date(t.registration_closes_at).getTime();
+  const registrationOpen =
+    (t.status === "open" || t.status === "draft") && !deadlinePassed;
+
+  const belowMin = t.min_rating != null && myDisplay != null && myDisplay < t.min_rating;
+  const aboveMax = t.max_rating != null && myDisplay != null && myDisplay > t.max_rating;
+  const outOfRange = belowMin || aboveMax;
 
   const anyError =
     (enter.isError && enter.error) ||
@@ -131,6 +147,24 @@ function Body({
         </Text>
       </View>
 
+      {/* Requirements */}
+      {t.registration_closes_at != null || t.min_rating != null || t.max_rating != null ? (
+        <Card style={{ gap: spacing.xs }}>
+          {t.registration_closes_at != null ? (
+            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+              Registration {deadlinePassed ? "closed" : "closes"}:{" "}
+              {new Date(t.registration_closes_at).toLocaleString()}
+            </Text>
+          ) : null}
+          {t.min_rating != null || t.max_rating != null ? (
+            <Text style={{ color: colors.textSecondary, fontSize: 13 }}>
+              Rating range: {t.min_rating != null ? t.min_rating.toFixed(1) : "any"} –{" "}
+              {t.max_rating != null ? t.max_rating.toFixed(1) : "any"}
+            </Text>
+          ) : null}
+        </Card>
+      ) : null}
+
       {/* Player actions */}
       {registrationOpen ? (
         <Card style={{ gap: spacing.sm }}>
@@ -144,11 +178,25 @@ function Body({
               onPress={() => withdraw.mutate()}
               loading={withdraw.isPending}
             />
+          ) : outOfRange ? (
+            <Text style={{ color: colors.danger, fontSize: 13 }}>
+              Your rating {myDisplay?.toFixed(1)} is{" "}
+              {belowMin ? "below the minimum" : "above the maximum"} for this tournament.
+            </Text>
           ) : (
             <Button label="Sign up" onPress={() => enter.mutate()} loading={enter.isPending} />
           )}
         </Card>
-      ) : null}
+      ) : (
+        <Card style={{ gap: spacing.sm }}>
+          <Text style={{ color: colors.text }}>
+            {active.length} entrant{active.length === 1 ? "" : "s"}
+          </Text>
+          {deadlinePassed && (t.status === "open" || t.status === "draft") ? (
+            <Text style={{ color: colors.textMuted, fontSize: 13 }}>Registration has closed.</Text>
+          ) : null}
+        </Card>
+      )}
 
       {/* Organizer controls */}
       {isOrganizer ? (

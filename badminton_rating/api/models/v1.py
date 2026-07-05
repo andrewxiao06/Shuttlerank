@@ -215,6 +215,11 @@ class TournamentCreate(BaseModel):
     ranked: bool = False
     starts_at: datetime
     ends_at: Optional[datetime] = None
+    # Registration auto-closes at this time (null = open until pairings).
+    registration_closes_at: Optional[datetime] = None
+    # Entry gates on the 1.0–5.0 display rating (null = no bound).
+    min_rating: Optional[float] = Field(default=None, ge=1.0, le=8.0)
+    max_rating: Optional[float] = Field(default=None, ge=1.0, le=8.0)
 
 
 class TournamentEntryOut(BaseModel):
@@ -233,6 +238,9 @@ class TournamentOut(BaseModel):
     ranked: bool
     starts_at: datetime
     ends_at: Optional[datetime]
+    registration_closes_at: Optional[datetime]
+    min_rating: Optional[float]
+    max_rating: Optional[float]
     status: TournamentStatus
     organizer_user_id: Optional[str]
     entries: List[TournamentEntryOut]

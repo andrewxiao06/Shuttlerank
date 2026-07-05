@@ -31,8 +31,20 @@ export function NewTournamentView() {
   const [format, setFormat] = useState<TournamentFormat | null>(null);
   const [ranked, setRanked] = useState(false);
   const [startsAt, setStartsAt] = useState("");
+  const [registrationClosesAt, setRegistrationClosesAt] = useState("");
+  const [minRating, setMinRating] = useState("");
+  const [maxRating, setMaxRating] = useState("");
 
-  const ready = name.trim().length > 0 && format != null && startsAt !== "";
+  const minNum = minRating === "" ? null : Number(minRating);
+  const maxNum = maxRating === "" ? null : Number(maxRating);
+  const ratingRangeInvalid =
+    minNum != null && maxNum != null && minNum > maxNum;
+
+  const ready =
+    name.trim().length > 0 &&
+    format != null &&
+    startsAt !== "" &&
+    !ratingRangeInvalid;
 
   const submit = useMutation({
     mutationFn: () =>
@@ -41,6 +53,12 @@ export function NewTournamentView() {
         format: format!,
         ranked: isAdmin && ranked,
         starts_at: new Date(startsAt).toISOString(),
+        registration_closes_at:
+          registrationClosesAt !== ""
+            ? new Date(registrationClosesAt).toISOString()
+            : null,
+        min_rating: minNum,
+        max_rating: maxNum,
       }),
     onSuccess: (t) => router.push(`/tournaments/${t.id}`),
   });
@@ -90,6 +108,61 @@ export function NewTournamentView() {
             className="mt-2 block h-12 w-full rounded-md border border-border bg-surface px-3 text-body-md outline-none focus:border-primary"
           />
         </label>
+
+        <label className="block">
+          <span className="text-label uppercase text-text-secondary">
+            Registration closes
+          </span>
+          <input
+            type="datetime-local"
+            value={registrationClosesAt}
+            onChange={(e) => setRegistrationClosesAt(e.target.value)}
+            className="mt-2 block h-12 w-full rounded-md border border-border bg-surface px-3 text-body-md outline-none focus:border-primary"
+          />
+          <span className="mt-1 block text-caption text-text-muted">
+            Optional — sign-ups auto-close at this time. Leave blank to stay
+            open until you generate pairings.
+          </span>
+        </label>
+
+        <div>
+          <p className="text-label uppercase text-text-secondary">
+            Rating range
+          </p>
+          <p className="mt-1 text-caption text-text-muted">
+            Optional — restrict entry to players in this rating band (1.0–5.0).
+          </p>
+          <div className="mt-2 flex items-center gap-3">
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="1"
+              max="8"
+              value={minRating}
+              onChange={(e) => setMinRating(e.target.value)}
+              placeholder="Min"
+              className="h-12 w-full rounded-md border border-border bg-surface px-3 text-body-md outline-none focus:border-primary"
+            />
+            <span className="text-text-muted">to</span>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              min="1"
+              max="8"
+              value={maxRating}
+              onChange={(e) => setMaxRating(e.target.value)}
+              placeholder="Max"
+              className="h-12 w-full rounded-md border border-border bg-surface px-3 text-body-md outline-none focus:border-primary"
+            />
+          </div>
+          {ratingRangeInvalid ? (
+            <p className="mt-1 text-caption text-danger">
+              Min rating can&apos;t be higher than max.
+            </p>
+          ) : null}
+        </div>
 
         {isAdmin ? (
           <label

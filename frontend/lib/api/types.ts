@@ -293,6 +293,9 @@ export const TournamentCreateSchema = z.object({
   ranked: z.boolean(),
   starts_at: z.string(),
   ends_at: z.string().nullable().optional(),
+  registration_closes_at: z.string().nullable().optional(),
+  min_rating: z.number().nullable().optional(),
+  max_rating: z.number().nullable().optional(),
 });
 export type TournamentCreate = z.infer<typeof TournamentCreateSchema>;
 
@@ -311,6 +314,9 @@ export const TournamentSchema = z.object({
   ranked: z.boolean(),
   starts_at: z.string(),
   ends_at: z.string().nullable(),
+  registration_closes_at: z.string().nullable().optional(),
+  min_rating: z.number().nullable().optional(),
+  max_rating: z.number().nullable().optional(),
   status: TournamentStatusSchema,
   organizer_user_id: z.string().nullable(),
   entries: z.array(TournamentEntrySchema),

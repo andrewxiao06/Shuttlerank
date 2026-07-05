@@ -25,7 +25,7 @@ export default function RootLayout() {
             <Stack.Screen name="edit-profile" options={{ headerShown: true, title: "Edit profile" }} />
             <Stack.Screen name="player/[id]" options={{ headerShown: true, title: "Player" }} />
             <Stack.Screen name="match/[id]" options={{ headerShown: true, title: "Match" }} />
-            <Stack.Screen name="tournaments/index" options={{ headerShown: true, title: "Tournaments" }} />
+            <Stack.Screen name="tournaments/new" options={{ headerShown: true, title: "Host a tournament" }} />
             <Stack.Screen name="tournaments/[id]" options={{ headerShown: true, title: "Tournament" }} />
           </Stack>
         </SafeAreaProvider>
