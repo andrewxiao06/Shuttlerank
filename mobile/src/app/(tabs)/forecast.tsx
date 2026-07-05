@@ -83,6 +83,12 @@ export default function Forecast() {
             ) : null}
           </Card>
 
+          <ProjectedScore
+            youName={you!.display_name ?? you!.name}
+            oppName={opp!.display_name ?? opp!.name}
+            winProbability={q.data.win_probability}
+          />
+
           <View style={{ flexDirection: "row", gap: spacing.md }}>
             <RatingMini label={you!.display_name ?? you!.name} display={q.data.player_display} />
             <RatingMini label={opp!.display_name ?? opp!.name} display={q.data.opponent_display} />
@@ -133,6 +139,54 @@ function PlayerSlot({
       ) : (
         <PlayerSearch onPick={onPick} excludeIds={excludeIds} />
       )}
+    </View>
+  );
+}
+
+// Rough scoreline from the win probability. Badminton games go to 21; the
+// favorite takes 21 and the underdog's total falls as the matchup gets more
+// lopsided (even ≈ 21–19, near-certain ≈ 21–5). Illustrative, not a promise.
+function projectedScore(winProbability: number): { you: number; opp: number } {
+  const youFavored = winProbability >= 0.5;
+  const pf = youFavored ? winProbability : 1 - winProbability;
+  const m = (pf - 0.5) / 0.5; // 0 = even, 1 = near-certain
+  const loser = Math.max(3, Math.min(20, Math.round(19 - m * 14)));
+  return youFavored ? { you: 21, opp: loser } : { you: loser, opp: 21 };
+}
+
+function ProjectedScore({
+  youName,
+  oppName,
+  winProbability,
+}: {
+  youName: string;
+  oppName: string;
+  winProbability: number;
+}) {
+  const s = projectedScore(winProbability);
+  return (
+    <Card style={{ alignItems: "center", gap: spacing.sm }}>
+      <Text style={{ color: colors.textSecondary, fontSize: 13, textTransform: "uppercase" }}>
+        Projected score
+      </Text>
+      <View style={{ flexDirection: "row", alignItems: "flex-end", gap: spacing.md }}>
+        <ScoreCol name={youName} score={s.you} win={s.you > s.opp} />
+        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.textMuted }}>–</Text>
+        <ScoreCol name={oppName} score={s.opp} win={s.opp > s.you} />
+      </View>
+    </Card>
+  );
+}
+
+function ScoreCol({ name, score, win }: { name: string; score: number; win: boolean }) {
+  return (
+    <View style={{ alignItems: "center", maxWidth: 120 }}>
+      <Text style={{ fontSize: 40, fontWeight: "800", color: win ? colors.info : colors.text }}>
+        {score}
+      </Text>
+      <Text numberOfLines={1} style={{ color: colors.textMuted, fontSize: 12 }}>
+        {name}
+      </Text>
     </View>
   );
 }
