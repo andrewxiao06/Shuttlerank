@@ -5,6 +5,14 @@ import { Card } from "./ui/Card";
 import type { CategoryMatch, MatchParticipant } from "../lib/api/types";
 import { colors, spacing } from "../lib/theme";
 
+// "2026-06-15" → "6/15/26". Parse parts directly to avoid the UTC-midnight
+// off-by-one on date-only strings.
+function formatMatchDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return `${m}/${d}/${String(y).slice(-2)}`;
+}
+
 /*
  * Match row — shows both sides at a glance: each team's players (avatar +
  * name), the score, and the viewer's rating delta. Names/avatars come off
@@ -35,7 +43,7 @@ export function MatchRow({
       <Card style={{ gap: spacing.sm }}>
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
           <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-            {match.participants.length > 2 ? "Doubles" : "Singles"} · {match.played_at}
+            {match.participants.length > 2 ? "Doubles" : "Singles"} · {formatMatchDate(match.played_at)}
           </Text>
           <Text
             style={{
