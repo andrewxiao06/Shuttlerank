@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { Avatar } from "../../../components/ui/Avatar";
 import { Card } from "../../../components/ui/Card";
 import { Screen } from "../../../components/ui/Screen";
 import { AsyncBoundary } from "../../../components/ui/AsyncBoundary";
@@ -79,9 +80,14 @@ function HomeBody({
     <>
       {/* Hero */}
       <Card style={{ gap: spacing.sm }}>
-        <Text style={{ color: colors.textSecondary, fontSize: 13, textTransform: "uppercase" }}>
-          {me.display_name ?? me.name}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+          <Avatar src={me.avatar_url} name={me.display_name ?? me.name} size={40} />
+          <Text
+            style={{ color: colors.textSecondary, fontSize: 13, textTransform: "uppercase" }}
+          >
+            {me.display_name ?? me.name}
+          </Text>
+        </View>
         <Text style={{ fontSize: 48, fontWeight: "800", color: colors.text }}>
           {rating && rating.match_count > 0 ? formatRating(rating.display) : "—"}
         </Text>

@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { FlatList, Pressable, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { Card } from "../../../components/ui/Card";
+import { Screen } from "../../../components/ui/Screen";
 import { AsyncBoundary } from "../../../components/ui/AsyncBoundary";
+import { RankedBadge, statusLabel } from "../../../components/tournament/TournamentBadge";
 import { listTournaments } from "../../../lib/api/client";
 import type { Tournament } from "../../../lib/api/types";
-import { colors, radius, spacing } from "../../../lib/theme";
+import { colors, spacing } from "../../../lib/theme";
 
 const STATUS_ORDER: Record<string, number> = {
   in_progress: 0,
@@ -16,7 +17,7 @@ const STATUS_ORDER: Record<string, number> = {
 };
 
 /*
- * Tournaments — browse all events. Tap one for detail (enter / withdraw,
+ * Tournaments tab — browse all events. Tap one for detail (enter / withdraw,
  * organizer controls). Hosting a new tournament stays on the web for now.
  */
 export default function Tournaments() {
@@ -28,7 +29,14 @@ export default function Tournaments() {
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }} edges={["bottom"]}>
+    <Screen padded={false}>
+      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
+        <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>
+          Tournaments
+        </Text>
+        <Text style={{ color: colors.textSecondary }}>Browse and enter events</Text>
+      </View>
+
       <AsyncBoundary
         isPending={q.isPending}
         isError={q.isError}
@@ -51,7 +59,7 @@ export default function Tournaments() {
           )}
         />
       </AsyncBoundary>
-    </SafeAreaView>
+    </Screen>
   );
 }
 
@@ -78,28 +86,5 @@ function Row({ t }: { t: Tournament }) {
         <Text style={{ color: colors.textMuted, fontSize: 11 }}>entrants</Text>
       </View>
     </Card>
-  );
-}
-
-export function RankedBadge({ ranked }: { ranked: boolean }) {
-  return (
-    <View
-      style={{
-        borderRadius: radius.pill,
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 2,
-        backgroundColor: ranked ? colors.accentSoft : colors.surfaceMuted,
-      }}
-    >
-      <Text style={{ fontSize: 10, fontWeight: "700", color: ranked ? colors.accent : colors.textSecondary }}>
-        {ranked ? "RANKED" : "CASUAL"}
-      </Text>
-    </View>
-  );
-}
-
-export function statusLabel(s: string): string {
-  return (
-    { draft: "Draft", open: "Open", in_progress: "In progress", completed: "Completed" }[s] ?? s
   );
 }

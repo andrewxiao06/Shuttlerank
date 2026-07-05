@@ -21,7 +21,7 @@ import {
 } from "../../../lib/api/client";
 import type { Tournament } from "../../../lib/api/types";
 import { colors, spacing } from "../../../lib/theme";
-import { RankedBadge, statusLabel } from "./index";
+import { RankedBadge, statusLabel } from "../../../components/tournament/TournamentBadge";
 
 /*
  * Tournament detail — meta, entrants, and actions. Players enter/withdraw

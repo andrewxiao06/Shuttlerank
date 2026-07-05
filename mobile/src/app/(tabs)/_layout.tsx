@@ -4,9 +4,9 @@ import { Redirect, Tabs } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { colors } from "../../../lib/theme";
 
-// Bottom tab navigator — mirrors the web app's MobileTabBar:
-// Home / Leaderboard / Submit / Inbox / Profile. Gated: signed-out users
-// are redirected to the sign-in screen.
+// Bottom tab navigator: Home / Leaderboard / Tournaments / Submit / Inbox /
+// Profile. Forecast is reachable from the Home quick actions, so it's hidden
+// from the bar (href: null). Gated: signed-out users go to the sign-in screen.
 export default function TabsLayout() {
   const { isLoaded, isSignedIn } = useAuth();
 
@@ -57,6 +57,15 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="tournaments"
+        options={{
+          title: "Events",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="trophy-outline" color={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="submit"
         options={{
           title: "Submit",
@@ -83,6 +92,8 @@ export default function TabsLayout() {
           ),
         }}
       />
+      {/* Forecast is reachable from Home's quick actions, not the tab bar. */}
+      <Tabs.Screen name="forecast" options={{ href: null }} />
     </Tabs>
   );
 }
