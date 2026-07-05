@@ -32,7 +32,7 @@ export function MatchRow({
   const theirScore = mySide === "A" ? match.team_b_score : match.team_a_score;
   const youWon = viewer?.team === match.winner_team;
   const verified = match.status === "verified";
-  const ago = relativeTime(match.played_at);
+  const played = formatMatchDate(match.played_at);
 
   const inner = (
     <div
@@ -44,7 +44,7 @@ export function MatchRow({
     >
       <div className="flex items-center justify-between text-caption text-text-secondary">
         <span>
-          {match.participants.length > 2 ? "Doubles" : "Singles"} · {ago}
+          {match.participants.length > 2 ? "Doubles" : "Singles"} · {played}
         </span>
         {verified ? (
           <span className={cn(youWon ? "text-accent" : "text-danger")}>
@@ -100,13 +100,10 @@ function Side({
   );
 }
 
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  const days = Math.round((Date.now() - then) / (1000 * 60 * 60 * 24));
-  if (days <= 0) return "today";
-  if (days === 1) return "yesterday";
-  if (days < 7) return `${days} days ago`;
-  if (days < 30) return `${Math.round(days / 7)}w ago`;
-  if (days < 365) return `${Math.round(days / 30)}mo ago`;
-  return `${Math.round(days / 365)}y ago`;
+// "2026-06-15" → "6/15/26". Parse the parts directly (not new Date()) to
+// avoid the UTC-midnight off-by-one that shifts the day in some timezones.
+function formatMatchDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  return `${m}/${d}/${String(y).slice(-2)}`;
 }
