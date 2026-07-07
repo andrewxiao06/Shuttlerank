@@ -35,3 +35,12 @@ pytest tests/test_engine.py -v
 The simulation script (`engine/simulator.py`) generates 200 synthetic players,
 runs 5,000 matches through the algorithm, and validates that computed ratings
 correlate with true skill at r > 0.85.
+
+## License
+
+Copyright © 2026 Andrew Xiao. All rights reserved.
+
+This project is **source-available for portfolio and reference purposes only**
+— it is not open-source. You may view the code, but not use, copy, modify,
+distribute, or run it as a service without written permission. See
+[`LICENSE`](./LICENSE) for details.
