@@ -106,11 +106,20 @@ class PlayerGender(str, enum.Enum):
 
 class RatingCategory(str, enum.Enum):
     """
-    Rating buckets. OVERALL is the only bucket written today — every player
-    has exactly one rating regardless of format or gender. The legacy
-    gendered/casual values remain so historical match rows still deserialize.
+    Rating buckets.
+
+    SINGLES and DOUBLES are the two independent ratings a player carries —
+    people are genuinely better at one format than the other, so they evolve
+    separately. OVERALL is retained as the *self-pick seed* bucket: it holds
+    the level a player reports at onboarding, which seeds whichever format
+    they play first (see services.categories.seed_for_new_category).
+
+    The legacy gendered/casual values remain so historical match rows still
+    deserialize.
     """
     OVERALL = "overall"
+    SINGLES = "singles"
+    DOUBLES = "doubles"
     # Legacy values — read-only, kept for old rows.
     MENS_SINGLES = "mens_singles"
     WOMENS_SINGLES = "womens_singles"

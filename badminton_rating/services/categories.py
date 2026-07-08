@@ -26,12 +26,19 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from badminton_rating.engine.glicko import (
+    DISPLAY_FLOOR,
     MatchType,
     PlayerRating,
     apply_ceiling,
+    from_display_rating,
     process_match,
+    to_display_rating,
 )
 from badminton_rating.db.models import (
+    DEFAULT_START_DISPLAY,
+    INITIAL_CEILING,
+    INITIAL_RD,
+    INITIAL_SIGMA,
     Match,
     MatchMode,
     MatchPlayer,
@@ -120,24 +127,166 @@ async def _load_players_locked(
     return found
 
 
-async def get_or_create_overall_rating(
+# Singles and Doubles are the two independent played ratings.
+PLAYED_CATEGORIES = (RatingCategory.SINGLES, RatingCategory.DOUBLES)
+
+
+def category_for_mode(is_doubles: bool) -> RatingCategory:
+    return RatingCategory.DOUBLES if is_doubles else RatingCategory.SINGLES
+
+
+def _other_played(category: RatingCategory) -> RatingCategory:
+    return (
+        RatingCategory.DOUBLES
+        if category is RatingCategory.SINGLES
+        else RatingCategory.SINGLES
+    )
+
+
+# A strong doubles player is usually a touch weaker at singles (no partner /
+# court coverage help), so seeding Singles from Doubles knocks a bit off.
+# Seeding Doubles from Singles carries straight across. On the 1.0–5.0 scale.
+SINGLES_FROM_DOUBLES_PENALTY = 0.25
+
+# New ratings seeded from another rating start provisional (wider than a
+# settled RD, narrower than a total unknown) so they "even out" within a few
+# games while still leaning on what we already know.
+PROVISIONAL_SEED_RD = 200.0
+
+
+@dataclass(frozen=True)
+class _Seed:
+    r: float
+    rd: float
+    ceiling: float
+
+
+def seed_for_new_category(
+    category: RatingCategory,
+    other_row: Optional[PlayerCategoryRating],
+    overall_row: Optional[PlayerCategoryRating],
+) -> _Seed:
+    """Pure: where a brand-new SINGLES/DOUBLES rating should start.
+
+    Priority:
+      1. The *other* format, if the player has actually played it — apply the
+         asymmetric offset (Singles ← Doubles − penalty; Doubles ← Singles).
+      2. The self-pick seed (OVERALL bucket), if present — take the player's
+         word for their level.
+      3. The beginner default.
+    """
+    if other_row is not None and other_row.match_count > 0:
+        base = to_display_rating(other_row.r)
+        seed_display = (
+            base - SINGLES_FROM_DOUBLES_PENALTY
+            if category is RatingCategory.SINGLES
+            else base
+        )
+        return _Seed(
+            r=from_display_rating(max(DISPLAY_FLOOR, seed_display)),
+            rd=PROVISIONAL_SEED_RD,
+            ceiling=other_row.ceiling,
+        )
+    if overall_row is not None:
+        return _Seed(
+            r=overall_row.r,
+            rd=INITIAL_RD,
+            ceiling=overall_row.ceiling,
+        )
+    return _Seed(
+        r=from_display_rating(DEFAULT_START_DISPLAY),
+        rd=INITIAL_RD,
+        ceiling=INITIAL_CEILING,
+    )
+
+
+async def _rating_row(
     session: AsyncSession,
     player_id: int,
-) -> PlayerCategoryRating:
-    """Look up the player's single rating row; create with defaults if missing."""
+    category: RatingCategory,
+    *,
+    lock: bool = False,
+) -> Optional[PlayerCategoryRating]:
     stmt = select(PlayerCategoryRating).where(
         PlayerCategoryRating.player_id == player_id,
-        PlayerCategoryRating.category == RatingCategory.OVERALL,
-    ).with_for_update()
-    row = (await session.execute(stmt)).scalar_one_or_none()
+        PlayerCategoryRating.category == category,
+    )
+    if lock:
+        stmt = stmt.with_for_update()
+    return (await session.execute(stmt)).scalar_one_or_none()
+
+
+async def get_or_create_rating(
+    session: AsyncSession,
+    player_id: int,
+    category: RatingCategory,
+) -> PlayerCategoryRating:
+    """Look up a player's SINGLES/DOUBLES rating row; create it cross-seeded
+    from the other format (or the self-pick seed) if it doesn't exist yet."""
+    row = await _rating_row(session, player_id, category, lock=True)
     if row is not None:
         return row
-    # Model defaults handle starting r (= from_display_rating(INITIAL_CEILING))
-    # and ceiling — see db/models.PlayerCategoryRating._INITIAL_CATEGORY_R.
-    row = PlayerCategoryRating(player_id=player_id, category=RatingCategory.OVERALL)
+
+    other_row = await _rating_row(session, player_id, _other_played(category))
+    overall_row = await _rating_row(session, player_id, RatingCategory.OVERALL)
+    seed = seed_for_new_category(category, other_row, overall_row)
+
+    row = PlayerCategoryRating(
+        player_id=player_id,
+        category=category,
+        r=seed.r,
+        rd=seed.rd,
+        sigma=INITIAL_SIGMA,
+        ceiling=seed.ceiling,
+    )
     session.add(row)
     await session.flush()
     return row
+
+
+@dataclass(frozen=True)
+class EffectiveRating:
+    """A category rating ready for display. `seeded` is True when the player
+    has no row yet, so `r`/`rd` are a projected starting point (not persisted)."""
+    category: RatingCategory
+    r: float
+    rd: float
+    ceiling: float
+    match_count: int
+    last_active: Optional[date]
+    seeded: bool
+
+
+async def effective_rating(
+    session: AsyncSession,
+    player_id: int,
+    category: RatingCategory,
+) -> EffectiveRating:
+    """Read-only: the player's SINGLES/DOUBLES rating, or a projected seed if
+    they haven't played that format yet. Never writes — safe on GET paths."""
+    row = await _rating_row(session, player_id, category)
+    if row is not None:
+        return EffectiveRating(
+            category=category,
+            r=row.r,
+            rd=row.rd,
+            ceiling=row.ceiling,
+            match_count=row.match_count,
+            last_active=row.last_active,
+            seeded=False,
+        )
+    other_row = await _rating_row(session, player_id, _other_played(category))
+    overall_row = await _rating_row(session, player_id, RatingCategory.OVERALL)
+    seed = seed_for_new_category(category, other_row, overall_row)
+    return EffectiveRating(
+        category=category,
+        r=seed.r,
+        rd=seed.rd,
+        ceiling=seed.ceiling,
+        match_count=0,
+        last_active=None,
+        seeded=True,
+    )
 
 
 def _rating_from_row(row: PlayerCategoryRating) -> PlayerRating:
@@ -281,12 +430,14 @@ async def submit_category_match(
     team_a = [players_by_id[pid] for pid in sub.team_a_player_ids]
     team_b = [players_by_id[pid] for pid in sub.team_b_player_ids]
 
+    category = category_for_mode(sub.is_doubles)
+
     # Materialize rating rows up front so the audit snapshot uses
     # authoritative state — read-only here, written on verify.
     rating_rows = {}
     for player in (*team_a, *team_b):
-        rating_rows[player.id] = await get_or_create_overall_rating(
-            session, player.id
+        rating_rows[player.id] = await get_or_create_rating(
+            session, player.id, category
         )
 
     now = datetime.now(timezone.utc)
@@ -297,7 +448,7 @@ async def submit_category_match(
         team_a_score=sub.team_a_score,
         team_b_score=sub.team_b_score,
         winner_team=winner_team,
-        category=RatingCategory.OVERALL,
+        category=category,
         status=MatchStatus.PENDING,
         submitted_by_user_id=sub.submitted_by_user_id,
         verified_at=None,
@@ -363,9 +514,10 @@ async def verify_pending_match(
         submitted_by_user_id=match.submitted_by_user_id,
     )
 
+    category = category_for_mode(match.mode is MatchMode.DOUBLES)
     rating_rows = {}
     for pid in team_a_player_ids + team_b_player_ids:
-        rating_rows[pid] = await get_or_create_overall_rating(session, pid)
+        rating_rows[pid] = await get_or_create_rating(session, pid, category)
 
     pre_a = [_rating_from_row(rating_rows[pid]) for pid in team_a_player_ids]
     pre_b = [_rating_from_row(rating_rows[pid]) for pid in team_b_player_ids]

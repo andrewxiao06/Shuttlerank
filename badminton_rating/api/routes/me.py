@@ -34,6 +34,10 @@ from badminton_rating.db.models import (
     RatingCategory,
 )
 from badminton_rating.db.session import get_db
+from badminton_rating.services.categories import (
+    PLAYED_CATEGORIES,
+    effective_rating,
+)
 from badminton_rating.engine.glicko import (
     INITIAL_RD,
     from_display_rating,
@@ -48,44 +52,28 @@ router = APIRouter(prefix="/players", tags=["players"])
 async def _category_ratings(
     session: AsyncSession, player_id: int
 ) -> List[CategoryRatingOut]:
-    """The player's single OVERALL rating, as a one-element list.
+    """Both played ratings — SINGLES then DOUBLES.
 
-    Players who haven't played yet get the same defaults a fresh rating row
-    would have, so every profile (and forecast) always shows a rating.
+    A player who hasn't played a format yet gets a *projected* seed for it
+    (from their other format or self-pick), flagged as calibrating, so every
+    profile always shows both ratings.
     """
-    row = (await session.execute(
-        select(PlayerCategoryRating).where(
-            PlayerCategoryRating.player_id == player_id,
-            PlayerCategoryRating.category == RatingCategory.OVERALL,
-        )
-    )).scalar_one_or_none()
-    if row is None:
-        # Unplaced player — show the beginner default; onboarding nudges them
-        # to self-pick their real level before they start playing.
-        display = DEFAULT_START_DISPLAY
-        return [CategoryRatingOut(
-            category=RatingCategory.OVERALL,
-            r=from_display_rating(display),
-            rd=INITIAL_RD,
+    out: List[CategoryRatingOut] = []
+    for category in PLAYED_CATEGORIES:
+        eff = await effective_rating(session, player_id, category)
+        display = to_display_rating(eff.r)
+        out.append(CategoryRatingOut(
+            category=eff.category,
+            r=eff.r,
+            rd=eff.rd,
             display=display,
             tier=get_tier(display),
-            calibrating=True,
-            ceiling=INITIAL_CEILING,
-            match_count=0,
-            last_active=None,
-        )]
-    display = to_display_rating(row.r)
-    return [CategoryRatingOut(
-        category=row.category,
-        r=row.r,
-        rd=row.rd,
-        display=display,
-        tier=get_tier(display),
-        calibrating=row.rd > 150.0,
-        ceiling=row.ceiling,
-        match_count=row.match_count,
-        last_active=row.last_active,
-    )]
+            calibrating=eff.seeded or eff.rd > 150.0,
+            ceiling=eff.ceiling,
+            match_count=eff.match_count,
+            last_active=eff.last_active,
+        ))
+    return out
 
 
 async def _set_starting_rating(
@@ -102,17 +90,24 @@ async def _set_starting_rating(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"starting rating must be between {SELF_PICK_MIN} and {SELF_PICK_MAX}",
         )
+    # Block a re-pick once the player has actually played either format.
+    played = (await session.execute(
+        select(PlayerCategoryRating.match_count).where(
+            PlayerCategoryRating.player_id == player_id,
+            PlayerCategoryRating.category.in_(PLAYED_CATEGORIES),
+        )
+    )).scalars().all()
+    if any(c > 0 for c in played):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="starting rating can only be set before your first match",
+        )
     row = (await session.execute(
         select(PlayerCategoryRating).where(
             PlayerCategoryRating.player_id == player_id,
             PlayerCategoryRating.category == RatingCategory.OVERALL,
         )
     )).scalar_one_or_none()
-    if row is not None and row.match_count > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="starting rating can only be set before your first match",
-        )
     if row is None:
         row = PlayerCategoryRating(
             player_id=player_id, category=RatingCategory.OVERALL

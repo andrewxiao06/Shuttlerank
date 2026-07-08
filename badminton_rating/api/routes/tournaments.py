@@ -209,7 +209,7 @@ async def signup(
         row = (await session.execute(
             select(PlayerCategoryRating).where(
                 PlayerCategoryRating.player_id == player.id,
-                PlayerCategoryRating.category == RatingCategory.OVERALL,
+                PlayerCategoryRating.category == RatingCategory.SINGLES,
             )
         )).scalar_one_or_none()
         display = to_display_rating(row.r) if row else 4.0
@@ -305,7 +305,7 @@ async def generate_pairings(
     rating_rows = (await session.execute(
         select(PlayerCategoryRating).where(
             PlayerCategoryRating.player_id.in_(pids),
-            PlayerCategoryRating.category == RatingCategory.OVERALL,
+            PlayerCategoryRating.category == RatingCategory.SINGLES,
         )
     )).scalars().all()
     ratings_by_pid = {r.player_id: r for r in rating_rows}
@@ -338,7 +338,7 @@ async def generate_pairings(
             team_a_score=0,
             team_b_score=0,
             winner_team=Team.A,  # placeholder — overwritten when result is recorded
-            category=RatingCategory.OVERALL,
+            category=RatingCategory.SINGLES,
             status=MatchStatus.PENDING,
             tournament_id=t.id,
             round=prop.round,
@@ -409,7 +409,7 @@ async def complete_tournament(
         rating_rows = (await session.execute(
             select(PlayerCategoryRating).where(
                 PlayerCategoryRating.player_id.in_(pids),
-                PlayerCategoryRating.category == RatingCategory.OVERALL,
+                PlayerCategoryRating.category == RatingCategory.SINGLES,
             )
         )).scalars().all()
         rating_by_pid = {r.player_id: r for r in rating_rows}
