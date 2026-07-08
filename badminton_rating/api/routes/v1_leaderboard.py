@@ -1,5 +1,5 @@
 """
-V1 leaderboard + forecast — single universal rating.
+V1 leaderboard + forecast — per-format (Singles / Doubles) ratings.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from badminton_rating.db.models import (
     RatingCategory,
 )
 from badminton_rating.db.session import get_db
+from badminton_rating.services.categories import effective_rating
 from badminton_rating.engine.glicko import (
     GLICKO_SCALE,
     INITIAL_R,
@@ -34,24 +35,40 @@ from badminton_rating.engine.glicko import (
 router = APIRouter(prefix="/v1", tags=["v1-leaderboard"])
 
 
+def _parse_category(value: str) -> RatingCategory:
+    """Resolve the ?category= query param to a played category."""
+    try:
+        cat = RatingCategory(value)
+    except ValueError:
+        cat = None
+    if cat not in (RatingCategory.SINGLES, RatingCategory.DOUBLES):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="category must be 'singles' or 'doubles'",
+        )
+    return cat
+
+
 @router.get("/leaderboard", response_model=CategoryLeaderboardOut)
 async def overall_leaderboard(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     min_matches: int = Query(0, ge=0),
+    category: str = Query("singles"),
     session: AsyncSession = Depends(get_db),
 ) -> CategoryLeaderboardOut:
+    cat = _parse_category(category)
     base = (
         select(PlayerCategoryRating, Player)
         .join(Player, PlayerCategoryRating.player_id == Player.id)
-        .where(PlayerCategoryRating.category == RatingCategory.OVERALL)
+        .where(PlayerCategoryRating.category == cat)
         .where(PlayerCategoryRating.match_count >= min_matches)
     )
 
     total_stmt = (
         select(func.count())
         .select_from(PlayerCategoryRating)
-        .where(PlayerCategoryRating.category == RatingCategory.OVERALL)
+        .where(PlayerCategoryRating.category == cat)
         .where(PlayerCategoryRating.match_count >= min_matches)
     )
     total = (await session.execute(total_stmt)).scalar_one()
@@ -103,6 +120,7 @@ _DEFAULT_R = from_display_rating(INITIAL_CEILING)
 async def overall_forecast(
     player_id: int,
     opponent_id: int = Query(...),
+    category: str = Query("singles"),
     session: AsyncSession = Depends(get_db),
 ) -> CategoryForecastOut:
     if player_id == opponent_id:
@@ -110,9 +128,10 @@ async def overall_forecast(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="player and opponent must be different",
         )
+    cat = _parse_category(category)
 
     # Both players must exist — but missing rating rows are fine; any two
-    # players can be forecast against each other.
+    # players can be forecast against each other (seeded values are used).
     players = (await session.execute(
         select(Player.id).where(Player.id.in_([player_id, opponent_id]))
     )).scalars().all()
@@ -123,22 +142,10 @@ async def overall_forecast(
             detail=f"player(s) not found: {sorted(missing)}",
         )
 
-    rows = (await session.execute(
-        select(PlayerCategoryRating).where(
-            PlayerCategoryRating.player_id.in_([player_id, opponent_id]),
-            PlayerCategoryRating.category == RatingCategory.OVERALL,
-        )
-    )).scalars().all()
-    by_pid = {r.player_id: r for r in rows}
-
-    def stats(pid: int) -> tuple[float, float]:
-        row = by_pid.get(pid)
-        if row is None:
-            return _DEFAULT_R, INITIAL_RD
-        return row.r, row.rd
-
-    p_r, p_rd = stats(player_id)
-    o_r, o_rd = stats(opponent_id)
+    p_eff = await effective_rating(session, player_id, cat)
+    o_eff = await effective_rating(session, opponent_id, cat)
+    p_r, p_rd = p_eff.r, p_eff.rd
+    o_r, o_rd = o_eff.r, o_eff.rd
 
     mu_p = (p_r - INITIAL_R) / GLICKO_SCALE
     mu_o = (o_r - INITIAL_R) / GLICKO_SCALE
