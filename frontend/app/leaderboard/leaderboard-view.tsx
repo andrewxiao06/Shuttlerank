@@ -27,6 +27,8 @@ export function LeaderboardView() {
 
   const offset = Math.max(0, Number(params.get("offset") ?? 0) || 0);
   const hideProvisional = params.get("hideProvisional") === "1";
+  const category =
+    params.get("category") === "doubles" ? "doubles" : "singles";
 
   const update = useCallback(
     (patch: Record<string, string | null>) => {
@@ -42,12 +44,13 @@ export function LeaderboardView() {
 
   const meQ = useQuery({ queryKey: ["me"], queryFn: getMe });
   const lbQ = useQuery({
-    queryKey: ["leaderboard", offset, hideProvisional],
+    queryKey: ["leaderboard", offset, hideProvisional, category],
     queryFn: () =>
       getLeaderboard({
         limit: PAGE_SIZE,
         offset,
         hideProvisional,
+        category,
       }),
   });
 
@@ -62,6 +65,25 @@ export function LeaderboardView() {
         <p className="text-label uppercase text-text-secondary">Leaderboard</p>
         <h1 className="text-h1">Where you stand</h1>
       </header>
+
+      {/* Singles / Doubles toggle — independent boards */}
+      <div className="mt-4 inline-flex rounded-lg border border-border bg-surface p-1">
+        {(["singles", "doubles"] as const).map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => update({ category: c === "singles" ? null : c, offset: null })}
+            className={cn(
+              "h-9 rounded-md px-4 text-body-md capitalize",
+              category === c
+                ? "bg-primary text-on-primary"
+                : "text-text-secondary hover:bg-surface-muted",
+            )}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
 
       {/* Search any player → their profile */}
       <div className="mt-5">

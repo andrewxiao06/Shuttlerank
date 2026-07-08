@@ -18,11 +18,12 @@ import { colors, radius, spacing } from "../../../lib/theme";
 export default function Forecast() {
   const [you, setYou] = useState<PlayerMe | null>(null);
   const [opp, setOpp] = useState<PlayerMe | null>(null);
+  const [category, setCategory] = useState<"singles" | "doubles">("singles");
 
   const ready = you != null && opp != null && you.id !== opp.id;
   const q = useQuery({
-    queryKey: ["forecast", you?.id, opp?.id],
-    queryFn: () => getForecast(you!.id, opp!.id),
+    queryKey: ["forecast", you?.id, opp?.id, category],
+    queryFn: () => getForecast(you!.id, opp!.id, category),
     enabled: ready,
   });
 
@@ -31,6 +32,42 @@ export default function Forecast() {
       <Text style={{ fontSize: 28, fontWeight: "800", color: colors.text }}>
         Who wins?
       </Text>
+
+      {/* Singles / Doubles — uses each player's rating for that format */}
+      <View
+        style={{
+          flexDirection: "row",
+          backgroundColor: colors.surface,
+          borderWidth: 1,
+          borderColor: colors.border,
+          borderRadius: radius.md,
+          padding: 3,
+        }}
+      >
+        {(["singles", "doubles"] as const).map((c) => (
+          <Pressable
+            key={c}
+            onPress={() => setCategory(c)}
+            style={{
+              flex: 1,
+              alignItems: "center",
+              paddingVertical: spacing.sm,
+              borderRadius: radius.sm,
+              backgroundColor: category === c ? colors.primary : "transparent",
+            }}
+          >
+            <Text
+              style={{
+                color: category === c ? colors.onPrimary : colors.textSecondary,
+                fontWeight: "700",
+                textTransform: "capitalize",
+              }}
+            >
+              {c}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
       {/* Pickers */}
       <View style={{ gap: spacing.md }}>

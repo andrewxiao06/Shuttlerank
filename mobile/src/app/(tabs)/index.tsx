@@ -10,7 +10,8 @@ import { AsyncBoundary } from "../../../components/ui/AsyncBoundary";
 import { MatchRow } from "../../../components/MatchRow";
 import { getMe, listPlayerMatches } from "../../../lib/api/client";
 import { formatRating, tierLabel, isCalibrating } from "../../../lib/format";
-import type { CategoryMatch, PlayerMe } from "../../../lib/api/types";
+import { pickRatings } from "../../../lib/ratings";
+import type { CategoryMatch, CategoryRating, PlayerMe } from "../../../lib/api/types";
 import { colors, radius, spacing } from "../../../lib/theme";
 
 /*
@@ -71,7 +72,7 @@ function HomeBody({
   onTournaments: () => void;
   onSignOut: () => void;
 }) {
-  const rating = me.ratings[0];
+  const { singles, doubles } = pickRatings(me.ratings);
   const recent = [...matches]
     .sort((a, b) => b.played_at.localeCompare(a.played_at))
     .slice(0, 3);
@@ -79,7 +80,7 @@ function HomeBody({
   return (
     <>
       {/* Hero */}
-      <Card style={{ gap: spacing.sm }}>
+      <Card style={{ gap: spacing.md }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
           <Avatar src={me.avatar_url} name={me.display_name ?? me.name} size={40} />
           <Text
@@ -88,24 +89,10 @@ function HomeBody({
             {me.display_name ?? me.name}
           </Text>
         </View>
-        <Text style={{ fontSize: 48, fontWeight: "800", color: colors.text }}>
-          {rating && rating.match_count > 0 ? formatRating(rating.display) : "—"}
-        </Text>
-        {rating ? (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-            <Text style={{ color: colors.accent, fontWeight: "600" }}>
-              {tierLabel(rating.display)}
-            </Text>
-            <Text style={{ color: colors.textMuted }}>
-              · {rating.match_count} match{rating.match_count === 1 ? "" : "es"}
-            </Text>
-          </View>
-        ) : null}
-        {rating && isCalibrating(rating.rd) ? (
-          <Text style={{ color: colors.warning }}>
-            Still calibrating — play a few matches.
-          </Text>
-        ) : null}
+        <View style={{ flexDirection: "row", gap: spacing.md }}>
+          <HeroRating label="Singles" rating={singles} />
+          <HeroRating label="Doubles" rating={doubles} />
+        </View>
       </Card>
 
       {/* Quick actions */}
@@ -137,6 +124,32 @@ function HomeBody({
         <Text style={{ color: colors.textMuted }}>Sign out</Text>
       </Pressable>
     </>
+  );
+}
+
+function HeroRating({ label, rating }: { label: string; rating: CategoryRating | null }) {
+  const played = (rating?.match_count ?? 0) > 0;
+  return (
+    <View style={{ flex: 1, gap: 2 }}>
+      <Text style={{ color: colors.textSecondary, fontSize: 12, textTransform: "uppercase" }}>
+        {label}
+      </Text>
+      <Text style={{ fontSize: 36, fontWeight: "800", color: colors.text }}>
+        {rating && played ? formatRating(rating.display) : "—"}
+      </Text>
+      {rating ? (
+        <Text style={{ color: colors.accent, fontWeight: "600", fontSize: 13 }}>
+          {tierLabel(rating.display)}
+        </Text>
+      ) : null}
+      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+        {played
+          ? `${rating!.match_count} match${rating!.match_count === 1 ? "" : "es"}`
+          : rating && isCalibrating(rating.rd)
+            ? "Calibrating"
+            : "Not yet played"}
+      </Text>
+    </View>
   );
 }
 

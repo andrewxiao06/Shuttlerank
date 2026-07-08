@@ -49,7 +49,8 @@ export default function EditProfile() {
     }
   }, [meQ.data]);
 
-  const canPickLevel = (meQ.data?.ratings[0]?.match_count ?? 0) === 0;
+  // Self-pick is allowed only before *any* format has been played.
+  const canPickLevel = (meQ.data?.ratings ?? []).every((r) => r.match_count === 0);
 
   const save = useMutation({
     mutationFn: () =>

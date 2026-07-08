@@ -77,7 +77,11 @@ export function TournamentDetailView({ tournamentId }: { tournamentId: number })
     t.registration_closes_at != null &&
     Date.now() >= new Date(t.registration_closes_at).getTime();
 
-  const myDisplay = meQ.data?.ratings?.[0]?.display ?? null;
+  // Tournaments pair on Singles ratings, so gate on the viewer's Singles.
+  const myDisplay =
+    meQ.data?.ratings?.find((r) => r.category === "singles")?.display ??
+    meQ.data?.ratings?.[0]?.display ??
+    null;
   const belowMin = t.min_rating != null && myDisplay != null && myDisplay < t.min_rating;
   const aboveMax = t.max_rating != null && myDisplay != null && myDisplay > t.max_rating;
   const outOfRange = belowMin || aboveMax;

@@ -202,12 +202,18 @@ export async function reportMatch(
 // ---------------------------------------------------------------------------
 
 export async function getLeaderboard(
-  opts: { limit?: number; offset?: number; hideProvisional?: boolean } = {},
+  opts: {
+    limit?: number;
+    offset?: number;
+    hideProvisional?: boolean;
+    category?: "singles" | "doubles";
+  } = {},
 ): Promise<Leaderboard> {
   return request("/v1/leaderboard", LeaderboardSchema, {
     query: {
       limit: opts.limit,
       offset: opts.offset,
+      category: opts.category ?? "singles",
       // Backend has no hide_provisional param yet; min_matches=10 keeps the
       // ranked board free of fresh accounts when the box is ticked.
       min_matches: opts.hideProvisional ? 10 : undefined,
@@ -222,9 +228,10 @@ export async function getLeaderboard(
 export async function getForecast(
   playerId: number,
   opponentId: number,
+  category: "singles" | "doubles" = "singles",
 ): Promise<Forecast> {
   return request(`/v1/players/${playerId}/forecast`, ForecastSchema, {
-    query: { opponent_id: opponentId },
+    query: { opponent_id: opponentId, category },
   });
 }
 

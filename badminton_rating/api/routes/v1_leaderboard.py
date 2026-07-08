@@ -101,6 +101,7 @@ async def overall_leaderboard(
             location=player.location,
         ))
     return CategoryLeaderboardOut(
+        category=cat,
         total=total,
         limit=limit,
         offset=offset,

@@ -167,12 +167,18 @@ export function reportMatch(
 // --- Leaderboard + forecast ------------------------------------------------
 
 export function getLeaderboard(
-  opts: { limit?: number; offset?: number; hideProvisional?: boolean } = {},
+  opts: {
+    limit?: number;
+    offset?: number;
+    hideProvisional?: boolean;
+    category?: "singles" | "doubles";
+  } = {},
 ): Promise<Leaderboard> {
   return request("/v1/leaderboard", LeaderboardSchema, {
     query: {
       limit: opts.limit,
       offset: opts.offset,
+      category: opts.category ?? "singles",
       min_matches: opts.hideProvisional ? 10 : undefined,
     },
   });
@@ -181,9 +187,10 @@ export function getLeaderboard(
 export function getForecast(
   playerId: number,
   opponentId: number,
+  category: "singles" | "doubles" = "singles",
 ): Promise<Forecast> {
   return request(`/v1/players/${playerId}/forecast`, ForecastSchema, {
-    query: { opponent_id: opponentId },
+    query: { opponent_id: opponentId, category },
   });
 }
 
