@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth, useUser } from "@clerk/nextjs";
 import { getMe, patchMe } from "@/lib/api";
-import { PlayerGenderSchema, type PlayerGender } from "@/lib/api/types";
+import { PlayerGenderSchema, type PlayerGender, type CategoryRating } from "@/lib/api/types";
+import { pickRatings } from "@/lib/ratings";
 import { Avatar } from "@/components/player/Avatar";
 import { MatchHistory } from "@/components/player/MatchHistory";
 import { TierChip } from "@/components/rating/TierChip";
@@ -73,8 +74,10 @@ export function MeSettingsView() {
 
   // New players (no rated match yet) haven't been onboarded — open the editor
   // and route them onward after saving. Existing players land on view mode.
-  const rating = meQ.data?.ratings[0];
-  const canPickLevel = (rating?.match_count ?? 0) === 0;
+  const { singles, doubles } = pickRatings(meQ.data?.ratings ?? []);
+  // Self-pick is allowed only before *any* format has been played.
+  const canPickLevel =
+    (meQ.data?.ratings ?? []).every((r) => r.match_count === 0);
   useEffect(() => {
     if (next && canPickLevel) setEditing(true);
   }, [next, canPickLevel]);
@@ -285,31 +288,11 @@ export function MeSettingsView() {
         </section>
       ) : null}
 
-      {/* Rating hero */}
-      {rating ? (
-        <section className="mt-6 rounded-xl border border-border bg-surface p-6 shadow-elevation-1">
-          <div className="flex items-center justify-between">
-            <p className="text-label uppercase text-text-secondary">Rating</p>
-            <CalibrationDot show={isCalibrating(rating.rd)} />
-          </div>
-          <p className="mt-2 text-display-lg sm:text-display-xl">
-            {rating.match_count > 0 ? formatRating(rating.display) : "—"}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <TierChip rating={rating.display} />
-            <span className="text-caption text-text-muted">
-              {rating.match_count} match{rating.match_count === 1 ? "" : "es"}
-              {rating.last_active ? ` · last ${rating.last_active}` : ""}
-            </span>
-          </div>
-          <div className="mt-4">
-            <CeilingBar display={rating.display} ceiling={rating.ceiling} />
-            <p className="mt-1 text-caption text-text-muted">
-              Rating cap {formatRating(rating.ceiling)} — raised by playing ranked tournaments.
-            </p>
-          </div>
-        </section>
-      ) : null}
+      {/* Rating heroes — Singles + Doubles */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <MeRating label="Singles" rating={singles} />
+        <MeRating label="Doubles" rating={doubles} />
+      </div>
 
       {/* History chart */}
       <RatingHistorySection playerId={me.id} />
@@ -334,6 +317,45 @@ function RatingHistorySection({ playerId }: { playerId: number }) {
       ) : (
         <RatingHistoryChart matches={verified} viewerId={playerId} />
       )}
+    </section>
+  );
+}
+
+function MeRating({
+  label,
+  rating,
+}: {
+  label: string;
+  rating: CategoryRating | null;
+}) {
+  const played = (rating?.match_count ?? 0) > 0;
+  return (
+    <section className="rounded-xl border border-border bg-surface p-6 shadow-elevation-1">
+      <div className="flex items-center justify-between">
+        <p className="text-label uppercase text-text-secondary">{label}</p>
+        <CalibrationDot show={!!rating && isCalibrating(rating.rd)} />
+      </div>
+      <p className="mt-2 text-display-lg">
+        {rating && played ? formatRating(rating.display) : "—"}
+      </p>
+      {rating ? (
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <TierChip rating={rating.display} />
+            <span className="text-caption text-text-muted">
+              {played
+                ? `${rating.match_count} match${rating.match_count === 1 ? "" : "es"}`
+                : "Not yet played"}
+            </span>
+          </div>
+          <div className="mt-4">
+            <CeilingBar display={rating.display} ceiling={rating.ceiling} />
+            <p className="mt-1 text-caption text-text-muted">
+              Rating cap {formatRating(rating.ceiling)}
+            </p>
+          </div>
+        </>
+      ) : null}
     </section>
   );
 }

@@ -21,11 +21,12 @@ import { formatPercent, formatRating } from "@/lib/format";
 export function ForecastView() {
   const [you, setYou] = useState<PlayerMe | null>(null);
   const [opp, setOpp] = useState<PlayerMe | null>(null);
+  const [category, setCategory] = useState<"singles" | "doubles">("singles");
 
   const ready = you != null && opp != null && you.id !== opp.id;
   const q = useQuery({
-    queryKey: ["forecast", you?.id, opp?.id],
-    queryFn: () => getForecast(you!.id, opp!.id),
+    queryKey: ["forecast", you?.id, opp?.id, category],
+    queryFn: () => getForecast(you!.id, opp!.id, category),
     enabled: ready,
   });
 
@@ -35,6 +36,25 @@ export function ForecastView() {
         <p className="text-label uppercase text-text-secondary">Forecast</p>
         <h1 className="text-h1">Who wins?</h1>
       </header>
+
+      {/* Singles / Doubles — uses each player's rating for that format */}
+      <div className="mt-4 inline-flex rounded-lg border border-border bg-surface p-1">
+        {(["singles", "doubles"] as const).map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setCategory(c)}
+            className={
+              "h-9 rounded-md px-4 text-body-md capitalize " +
+              (category === c
+                ? "bg-primary text-on-primary"
+                : "text-text-secondary hover:bg-surface-muted")
+            }
+          >
+            {c}
+          </button>
+        ))}
+      </div>
 
       <section className="mt-5 space-y-4 rounded-lg border border-border bg-surface p-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

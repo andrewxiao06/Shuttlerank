@@ -1,12 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { PlayerSearch } from "../../../components/PlayerSearch";
 import { Avatar } from "../../../components/ui/Avatar";
 import { getLeaderboard } from "../../../lib/api/client";
 import { formatRating, tierLabel, isCalibrating } from "../../../lib/format";
-import { colors, spacing } from "../../../lib/theme";
+import { colors, radius, spacing } from "../../../lib/theme";
+
+type Category = "singles" | "doubles";
 
 /*
  * Leaderboard — fetches the live board and renders it in a FlatList.
@@ -23,9 +26,11 @@ import { colors, spacing } from "../../../lib/theme";
  */
 export default function Leaderboard() {
   const router = useRouter();
+  const [category, setCategory] = useState<Category>("singles");
   const q = useQuery({
-    queryKey: ["leaderboard"],
-    queryFn: () => getLeaderboard(),
+    queryKey: ["leaderboard", category],
+    queryFn: () => getLeaderboard({ category }),
+    placeholderData: (prev) => prev, // keep the old board visible while switching
   });
 
   // --- Loading state ---
@@ -81,7 +86,41 @@ export default function Leaderboard() {
           paddingBottom: spacing.xl,
         }}
         ListHeaderComponent={
-          <View style={{ marginBottom: spacing.md }}>
+          <View style={{ marginBottom: spacing.md, gap: spacing.md }}>
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: radius.md,
+                padding: 3,
+              }}
+            >
+              {(["singles", "doubles"] as const).map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => setCategory(c)}
+                  style={{
+                    flex: 1,
+                    alignItems: "center",
+                    paddingVertical: spacing.sm,
+                    borderRadius: radius.sm,
+                    backgroundColor: category === c ? colors.primary : "transparent",
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: category === c ? colors.onPrimary : colors.textSecondary,
+                      fontWeight: "700",
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {c}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
             <PlayerSearch
               onPick={(p) => router.push(`/player/${p.id}`)}
               placeholder="Search for a player…"

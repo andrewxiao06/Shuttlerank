@@ -75,7 +75,11 @@ export default function TournamentDetail() {
               t={q.data}
               myId={meQ.data?.id}
               myClerkId={meQ.data?.clerk_user_id ?? null}
-              myDisplay={meQ.data?.ratings?.[0]?.display ?? null}
+              myDisplay={
+                meQ.data?.ratings?.find((r) => r.category === "singles")?.display ??
+                meQ.data?.ratings?.[0]?.display ??
+                null
+              }
               nameOf={nameOf}
               enter={enter}
               withdraw={withdraw}

@@ -19,11 +19,14 @@ import { z } from "zod";
 // ---------------------------------------------------------------------------
 
 /**
- * "overall" is the only bucket written today — one rating per player.
- * Legacy values remain so historical match rows still parse.
+ * Players carry two independent ratings: "singles" and "doubles". "overall"
+ * is the self-pick seed bucket. Legacy values remain so historical match
+ * rows still parse.
  */
 export const RatingCategorySchema = z.enum([
   "overall",
+  "singles",
+  "doubles",
   "mens_singles",
   "womens_singles",
   "mens_doubles",
@@ -83,6 +86,8 @@ export type TournamentStatus = z.infer<typeof TournamentStatusSchema>;
 
 export const CATEGORY_LABEL: Record<RatingCategory, string> = {
   overall: "Overall",
+  singles: "Singles",
+  doubles: "Doubles",
   mens_singles: "Men's singles",
   womens_singles: "Women's singles",
   mens_doubles: "Men's doubles",
@@ -93,6 +98,8 @@ export const CATEGORY_LABEL: Record<RatingCategory, string> = {
 
 export const CATEGORY_SHORT: Record<RatingCategory, string> = {
   overall: "Match",
+  singles: "Singles",
+  doubles: "Doubles",
   mens_singles: "M Singles",
   womens_singles: "W Singles",
   mens_doubles: "M Doubles",
