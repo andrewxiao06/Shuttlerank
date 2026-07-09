@@ -12,6 +12,11 @@ import { colors, radius, spacing } from "../lib/theme";
 
 const RECENT_COUNT = 5;
 
+type MatchFilter = "all" | "singles" | "doubles";
+
+// A match is doubles when a side has 2 players (4 participants total).
+const isDoubles = (m: CategoryMatch) => m.participants.length > 2;
+
 /*
  * Shared player profile. Used both for "me" (Profile tab passes its own
  * getMe data) and for viewing any other player (the /player/[id] route
@@ -73,10 +78,17 @@ function Body({
   onEdit?: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
+  const [filter, setFilter] = useState<MatchFilter>("all");
 
-  const sorted = [...matches].sort((a, b) =>
-    b.played_at.localeCompare(a.played_at),
-  );
+  const sorted = [...matches]
+    .sort((a, b) => b.played_at.localeCompare(a.played_at))
+    .filter((m) =>
+      filter === "all"
+        ? true
+        : filter === "doubles"
+          ? isDoubles(m)
+          : !isDoubles(m),
+    );
   const shown = showAll ? sorted : sorted.slice(0, RECENT_COUNT);
   const hasMore = sorted.length > RECENT_COUNT;
 
@@ -136,10 +148,52 @@ function Body({
           ) : null}
         </View>
 
+        {/* Singles / Doubles / Both filter */}
+        <View
+          style={{
+            flexDirection: "row",
+            backgroundColor: colors.surface,
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.md,
+            padding: 3,
+          }}
+        >
+          {(["all", "singles", "doubles"] as const).map((f) => (
+            <Pressable
+              key={f}
+              onPress={() => {
+                setFilter(f);
+                setShowAll(false);
+              }}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                paddingVertical: spacing.xs,
+                borderRadius: radius.sm,
+                backgroundColor: filter === f ? colors.primary : "transparent",
+              }}
+            >
+              <Text
+                style={{
+                  color: filter === f ? colors.onPrimary : colors.textSecondary,
+                  fontWeight: "600",
+                  fontSize: 13,
+                  textTransform: "capitalize",
+                }}
+              >
+                {f === "all" ? "Both" : f}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
         {matchesLoading ? (
           <Text style={{ color: colors.textMuted }}>Loading…</Text>
         ) : sorted.length === 0 ? (
-          <Text style={{ color: colors.textMuted }}>No matches yet.</Text>
+          <Text style={{ color: colors.textMuted }}>
+            {filter === "all" ? "No matches yet." : `No ${filter} matches yet.`}
+          </Text>
         ) : (
           shown.map((m) => (
             <MatchRow key={m.id} match={m} viewerId={player.id} />
