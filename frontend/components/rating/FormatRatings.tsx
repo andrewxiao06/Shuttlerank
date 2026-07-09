@@ -26,7 +26,15 @@ export function FormatRatings({
     <div>
       <div className="flex items-center justify-between">
         <p className="text-label uppercase text-text-secondary">{primary.label}</p>
-        <CalibrationDot show={!!p && isCalibrating(p.rd)} />
+        {p && isCalibrating(p.rd) ? (
+          <span
+            className="flex items-center gap-1.5 text-caption text-warning"
+            title="This rating is still settling — it can move a lot until you've played more."
+          >
+            <CalibrationDot show />
+            Calibrating
+          </span>
+        ) : null}
       </div>
       <p className="mt-1 text-display-lg sm:text-display-xl">
         {p && pPlayed ? formatRating(p.display) : "—"}
