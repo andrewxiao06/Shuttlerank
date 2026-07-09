@@ -31,10 +31,8 @@ def upgrade() -> None:
             FROM match_players mp
             JOIN matches m ON m.id = mp.match_id
             WHERE mp.player_id = pr.player_id
-              AND m.status = 'verified'
-              AND m.mode = (
-                  CASE WHEN pr.category = 'singles' THEN 'singles' ELSE 'doubles' END
-              )
+              AND m.status::text = 'verified'
+              AND m.mode::text = pr.category::text
         ), 0)
         WHERE pr.category IN ('singles', 'doubles')
         """
