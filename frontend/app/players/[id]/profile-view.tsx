@@ -2,16 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { getPlayer, listPlayerMatches } from "@/lib/api";
-import { type CategoryRating } from "@/lib/api/types";
-import { pickRatings } from "@/lib/ratings";
+import { FormatRatings } from "@/components/rating/FormatRatings";
 import { MatchHistory } from "@/components/player/MatchHistory";
 import { Avatar } from "@/components/player/Avatar";
-import { TierChip } from "@/components/rating/TierChip";
-import { CalibrationDot } from "@/components/rating/CalibrationDot";
-import { CeilingBar } from "@/components/rating/CeilingBar";
 import { RatingHistoryChart } from "@/components/player/RatingHistoryChart";
-import { formatRating } from "@/lib/format";
-import { isCalibrating } from "@/lib/tier";
 
 /*
  * Public profile view — read-only. "Your rating is the hero": the hero card
@@ -39,7 +33,6 @@ export function ProfileView({ playerId }: { playerId: number }) {
     );
 
   const player = playerQ.data;
-  const { singles, doubles } = pickRatings(player.ratings);
 
   const verifiedMatches = (matchesQ.data ?? []).filter(
     (m) => m.status === "verified",
@@ -63,11 +56,10 @@ export function ProfileView({ playerId }: { playerId: number }) {
         </div>
       </header>
 
-      {/* Hero ratings — Singles + Doubles are independent */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <FormatRating label="Singles" rating={singles} />
-        <FormatRating label="Doubles" rating={doubles} />
-      </div>
+      {/* Hero ratings — most-played format leads, the other tucked below */}
+      <section className="mt-6 rounded-xl border border-border bg-surface p-6 shadow-elevation-1">
+        <FormatRatings ratings={player.ratings} ceiling />
+      </section>
 
       {/* History chart */}
       <section className="mt-8 space-y-3">
@@ -82,45 +74,6 @@ export function ProfileView({ playerId }: { playerId: number }) {
       {/* Match history — recent by default, "Show all" to expand */}
       <MatchHistory playerId={playerId} />
     </main>
-  );
-}
-
-function FormatRating({
-  label,
-  rating,
-}: {
-  label: string;
-  rating: CategoryRating | null;
-}) {
-  const played = (rating?.match_count ?? 0) > 0;
-  return (
-    <section className="rounded-xl border border-border bg-surface p-6 shadow-elevation-1">
-      <div className="flex items-center justify-between">
-        <p className="text-label uppercase text-text-secondary">{label}</p>
-        <CalibrationDot show={!!rating && isCalibrating(rating.rd)} />
-      </div>
-      <p className="mt-2 text-display-lg">
-        {rating && played ? formatRating(rating.display) : "—"}
-      </p>
-      {rating ? (
-        <>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <TierChip rating={rating.display} />
-            <span className="text-caption text-text-muted">
-              {played
-                ? `${rating.match_count} match${rating.match_count === 1 ? "" : "es"}`
-                : "Not yet played"}
-            </span>
-          </div>
-          <div className="mt-4">
-            <CeilingBar display={rating.display} ceiling={rating.ceiling} />
-            <p className="mt-1 text-caption text-text-muted">
-              Rating cap {formatRating(rating.ceiling)}
-            </p>
-          </div>
-        </>
-      ) : null}
-    </section>
   );
 }
 

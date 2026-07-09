@@ -9,9 +9,8 @@ import { Screen } from "../../../components/ui/Screen";
 import { AsyncBoundary } from "../../../components/ui/AsyncBoundary";
 import { MatchRow } from "../../../components/MatchRow";
 import { getMe, listPlayerMatches } from "../../../lib/api/client";
-import { formatRating, tierLabel, isCalibrating } from "../../../lib/format";
-import { pickRatings } from "../../../lib/ratings";
-import type { CategoryMatch, CategoryRating, PlayerMe } from "../../../lib/api/types";
+import { FormatRatings } from "../../../components/FormatRatings";
+import type { CategoryMatch, PlayerMe } from "../../../lib/api/types";
 import { colors, radius, spacing } from "../../../lib/theme";
 
 /*
@@ -72,7 +71,6 @@ function HomeBody({
   onTournaments: () => void;
   onSignOut: () => void;
 }) {
-  const { singles, doubles } = pickRatings(me.ratings);
   const recent = [...matches]
     .sort((a, b) => b.played_at.localeCompare(a.played_at))
     .slice(0, 3);
@@ -89,10 +87,7 @@ function HomeBody({
             {me.display_name ?? me.name}
           </Text>
         </View>
-        <View style={{ flexDirection: "row", gap: spacing.md }}>
-          <HeroRating label="Singles" rating={singles} />
-          <HeroRating label="Doubles" rating={doubles} />
-        </View>
+        <FormatRatings ratings={me.ratings} />
       </Card>
 
       {/* Quick actions */}
@@ -124,32 +119,6 @@ function HomeBody({
         <Text style={{ color: colors.textMuted }}>Sign out</Text>
       </Pressable>
     </>
-  );
-}
-
-function HeroRating({ label, rating }: { label: string; rating: CategoryRating | null }) {
-  const played = (rating?.match_count ?? 0) > 0;
-  return (
-    <View style={{ flex: 1, gap: 2 }}>
-      <Text style={{ color: colors.textSecondary, fontSize: 12, textTransform: "uppercase" }}>
-        {label}
-      </Text>
-      <Text style={{ fontSize: 36, fontWeight: "800", color: colors.text }}>
-        {rating && played ? formatRating(rating.display) : "—"}
-      </Text>
-      {rating ? (
-        <Text style={{ color: colors.accent, fontWeight: "600", fontSize: 13 }}>
-          {tierLabel(rating.display)}
-        </Text>
-      ) : null}
-      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-        {played
-          ? `${rating!.match_count} match${rating!.match_count === 1 ? "" : "es"}`
-          : rating && isCalibrating(rating.rd)
-            ? "Calibrating"
-            : "Not yet played"}
-      </Text>
-    </View>
   );
 }
 
