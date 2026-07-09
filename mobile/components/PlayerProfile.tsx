@@ -6,9 +6,8 @@ import { Card } from "./ui/Card";
 import { AsyncBoundary } from "./ui/AsyncBoundary";
 import { MatchRow } from "./MatchRow";
 import { getPlayer, listPlayerMatches } from "../lib/api/client";
-import { formatRating, tierLabel, isCalibrating } from "../lib/format";
-import { pickRatings } from "../lib/ratings";
-import type { CategoryMatch, CategoryRating, PlayerMe } from "../lib/api/types";
+import { FormatRatings } from "./FormatRatings";
+import type { CategoryMatch, PlayerMe } from "../lib/api/types";
 import { colors, radius, spacing } from "../lib/theme";
 
 const RECENT_COUNT = 5;
@@ -62,42 +61,6 @@ export function PlayerProfile({
   );
 }
 
-function ProfileRating({ label, rating }: { label: string; rating: CategoryRating | null }) {
-  const played = (rating?.match_count ?? 0) > 0;
-  const calibrating = rating ? isCalibrating(rating.rd) : false;
-  return (
-    <Card style={{ flex: 1, alignItems: "center", gap: spacing.xs }}>
-      <Text style={{ color: colors.textSecondary, fontSize: 12, textTransform: "uppercase" }}>
-        {label}
-      </Text>
-      <Text style={{ fontSize: 40, fontWeight: "800", color: colors.text }}>
-        {rating && played ? formatRating(rating.display) : "—"}
-      </Text>
-      {rating ? (
-        <View
-          style={{
-            backgroundColor: colors.accentSoft,
-            paddingHorizontal: spacing.sm,
-            paddingVertical: 2,
-            borderRadius: radius.pill,
-          }}
-        >
-          <Text style={{ color: colors.accent, fontWeight: "600", fontSize: 12 }}>
-            {tierLabel(rating.display)}
-          </Text>
-        </View>
-      ) : null}
-      <Text style={{ color: colors.textMuted, fontSize: 12 }}>
-        {played
-          ? `${rating!.match_count} match${rating!.match_count === 1 ? "" : "es"}`
-          : calibrating
-            ? "Calibrating"
-            : "Not yet played"}
-      </Text>
-    </Card>
-  );
-}
-
 function Body({
   player,
   matches,
@@ -110,7 +73,6 @@ function Body({
   onEdit?: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
-  const { singles, doubles } = pickRatings(player.ratings);
 
   const sorted = [...matches].sort((a, b) =>
     b.played_at.localeCompare(a.played_at),
@@ -154,11 +116,10 @@ function Body({
         ) : null}
       </View>
 
-      {/* Hero ratings — Singles + Doubles are independent */}
-      <View style={{ flexDirection: "row", gap: spacing.md }}>
-        <ProfileRating label="Singles" rating={singles} />
-        <ProfileRating label="Doubles" rating={doubles} />
-      </View>
+      {/* Hero ratings — most-played format leads, the other tucked below */}
+      <Card>
+        <FormatRatings ratings={player.ratings} />
+      </Card>
 
       {/* Match history */}
       <View style={{ gap: spacing.sm }}>

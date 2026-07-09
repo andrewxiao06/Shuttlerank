@@ -1,17 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SignInButton, SignUpButton, useAuth } from "@clerk/nextjs";
 import { getMe, listPlayerMatches } from "@/lib/api";
-import { type CategoryRating } from "@/lib/api/types";
-import { pickRatings } from "@/lib/ratings";
-import { TierChip } from "@/components/rating/TierChip";
-import { CalibrationDot } from "@/components/rating/CalibrationDot";
+import { FormatRatings } from "@/components/rating/FormatRatings";
 import { MatchRow } from "@/components/match/MatchRow";
-import { formatRating } from "@/lib/format";
-import { isCalibrating } from "@/lib/tier";
 
 /*
  * Home dashboard — DESIGN.md Phase D spec: condensed profile hero,
@@ -38,14 +32,6 @@ export function HomeView() {
     enabled: playerId != null,
   });
 
-  // useMemo must run on every render — keep it above any conditional
-  // returns to satisfy React's rules-of-hooks. Sign-out flips
-  // `meQ.data` to undefined so the memo cheaply returns null.
-  const { singles, doubles } = useMemo(
-    () => pickRatings(meQ.data?.ratings ?? []),
-    [meQ.data],
-  );
-
   if (!isLoaded) return <Skeleton />;
   if (!isSignedIn) return <SignedOutHero />;
   if (meQ.isPending) return <Skeleton />;
@@ -70,9 +56,8 @@ export function HomeView() {
         <p className="text-label uppercase text-text-secondary">
           {me.display_name ?? me.name}
         </p>
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <HeroRating label="Singles" rating={singles} />
-          <HeroRating label="Doubles" rating={doubles} />
+        <div className="mt-3">
+          <FormatRatings ratings={me.ratings} />
         </div>
         <Link
           href={`/players/${me.id}`}
@@ -121,37 +106,6 @@ export function HomeView() {
         )}
       </section>
     </main>
-  );
-}
-
-function HeroRating({
-  label,
-  rating,
-}: {
-  label: string;
-  rating: CategoryRating | null;
-}) {
-  const played = (rating?.match_count ?? 0) > 0;
-  return (
-    <div className="rounded-lg border border-border bg-surface-muted/40 p-4">
-      <div className="flex items-center justify-between">
-        <p className="text-label uppercase text-text-secondary">{label}</p>
-        <CalibrationDot show={!!rating && isCalibrating(rating.rd)} />
-      </div>
-      <p className="mt-1 text-display-md">
-        {rating && played ? formatRating(rating.display) : "—"}
-      </p>
-      {rating ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <TierChip rating={rating.display} />
-          <span className="text-caption text-text-muted">
-            {played
-              ? `${rating.match_count} match${rating.match_count === 1 ? "" : "es"}`
-              : "Not yet played"}
-          </span>
-        </div>
-      ) : null}
-    </div>
   );
 }
 
