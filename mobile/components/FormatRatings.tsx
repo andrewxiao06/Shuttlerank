@@ -29,10 +29,10 @@ export function FormatRatings({ ratings }: { ratings: CategoryRating[] }) {
           <Text style={{ color: colors.textMuted }}>
             ·{" "}
             {pPlayed
-              ? `${p.match_count} match${p.match_count === 1 ? "" : "es"}`
-              : p && isCalibrating(p.rd)
-                ? "calibrating"
-                : "not yet played"}
+              ? `${p.match_count} match${p.match_count === 1 ? "" : "es"}${
+                  isCalibrating(p.rd) ? " · calibrating" : ""
+                }`
+              : "not yet played"}
           </Text>
         </View>
       ) : null}
