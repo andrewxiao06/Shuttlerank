@@ -81,14 +81,19 @@ export default function EditProfile() {
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.6,
+      base64: true,
     });
-    if (res.canceled || !res.assets[0]?.uri) return;
+    const asset = res.assets?.[0];
+    if (res.canceled || !asset?.base64) return;
     setPhotoBusy(true);
     setPhotoError(null);
     try {
-      // Clerk accepts a Blob; fetch the picked file URI into one.
-      const blob = await (await fetch(res.assets[0].uri)).blob();
-      await user.setProfileImage({ file: blob });
+      // In React Native, fetch(uri).blob() mis-types the file as
+      // text/plain, which Clerk rejects ("images are not supported"). Hand
+      // Clerk a proper data URI built from the picker's base64 instead.
+      const mime = asset.mimeType ?? "image/jpeg";
+      const dataUri = `data:${mime};base64,${asset.base64}`;
+      await user.setProfileImage({ file: dataUri });
       await user.reload();
       await patchMe({ avatar_url: user.imageUrl });
       setAvatar(user.imageUrl);
