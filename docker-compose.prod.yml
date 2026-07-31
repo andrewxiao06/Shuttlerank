@@ -10,22 +10,8 @@
 # The frontend is NOT here — it deploys to Vercel. Caddy fronts only the API.
 
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:?set in .env.prod}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set in .env.prod}
-      POSTGRES_DB: ${POSTGRES_DB:?set in .env.prod}
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    # No published port — only the api container reaches Postgres over the
-    # compose network. Keeps the DB off the public internet.
+  # Postgres is hosted on Neon (managed, backed up) — see DATABASE_URL in
+  # .env.prod. No local db container. Migrated off the on-box volume 2026-07.
 
   redis:
     image: redis:7-alpine
@@ -44,15 +30,14 @@ services:
     env_file:
       - .env.prod
     environment:
-      # Internal service URLs override whatever placeholders are in .env.prod.
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      # DATABASE_URL comes from .env.prod (Neon). REDIS_URL is the internal
+      # service address.
+      DATABASE_URL: ${DATABASE_URL:?set in .env.prod — Neon asyncpg URL}
       REDIS_URL: redis://redis:6379/0
       # NOTE: no UVICORN_EXTRA_ARGS (no --reload) and no CLERK_DEV_ALLOW_HEADER.
     expose:
       - "8000"          # reachable by Caddy on the internal network only
     depends_on:
-      db:
-        condition: service_healthy
       redis:
         condition: service_healthy
 
@@ -72,6 +57,7 @@ services:
       - api
 
 volumes:
-  pgdata:
+  # pgdata retired — database now lives on Neon. The old on-box volume can be
+  # removed once the Neon cutover is confirmed (docker volume rm dubr_pgdata).
   caddy_data:
   caddy_config:
