@@ -16,14 +16,15 @@ cd "$(dirname "$0")/.."
 : "${NEON:?Set NEON to your Neon connection string first (export NEON='postgresql://...')}"
 NEON="${NEON/-pooler/}"   # use the direct endpoint, not the pooler
 
-# Source the DB credentials for the local (source) database.
-set -a; . ./.env.prod; set +a
+# Docker Compose reads .env.prod itself; POSTGRES_USER/DB live inside the db
+# container, so pg_dump reads them there (do NOT source .env.prod as shell —
+# it isn't a shell file).
+DC="docker compose -f docker-compose.prod.yml --env-file .env.prod"
 
-DC="docker compose -f docker-compose.prod.yml"
-
-echo ">> Dumping local database ($POSTGRES_DB)…"
-$DC exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  --no-owner --no-privileges > /tmp/neon_dump.sql
+echo ">> Dumping local database…"
+$DC exec -T db sh -c \
+  'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-privileges' \
+  > /tmp/neon_dump.sql
 echo "   dump size: $(wc -l < /tmp/neon_dump.sql) lines"
 
 echo ">> Restoring into Neon…"
