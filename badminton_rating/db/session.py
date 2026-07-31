@@ -50,7 +50,9 @@ def _prepare_url_and_connect_args(raw_url: str) -> tuple[str, dict[str, Any]]:
         # Neon presents a valid publicly-trusted cert, so a default verifying
         # SSL context (asyncpg's ssl=True) works and stays secure.
         connect_args["ssl"] = True
-    return str(url), connect_args
+    # NB: str(url) masks the password as "***" — render explicitly so the real
+    # credential reaches the driver.
+    return url.render_as_string(hide_password=False), connect_args
 
 
 _url, _connect_args = _prepare_url_and_connect_args(DATABASE_URL)
