@@ -51,17 +51,20 @@ def _dev_header_allowed() -> bool:
     return os.environ.get("CLERK_DEV_ALLOW_HEADER") == "1"
 
 
-def _clerk_issuer() -> Optional[str]:
-    iss = os.environ.get("CLERK_ISSUER")
-    return iss.rstrip("/") if iss else None
+def _clerk_issuers() -> list[str]:
+    """Configured issuers. CLERK_ISSUER may be a comma-separated list so a
+    dev→prod cutover can trust both instances at once (zero downtime)."""
+    raw = os.environ.get("CLERK_ISSUER", "")
+    return [x.strip().rstrip("/") for x in raw.split(",") if x.strip()]
 
 
-def _jwks_url() -> Optional[str]:
+def _jwks_url_for(issuer: str) -> str:
+    """JWKS endpoint for an issuer. A single explicit CLERK_JWKS_URL still
+    overrides (legacy single-issuer setups)."""
     explicit = os.environ.get("CLERK_JWKS_URL")
     if explicit:
         return explicit
-    iss = _clerk_issuer()
-    return f"{iss}/.well-known/jwks.json" if iss else None
+    return f"{issuer}/.well-known/jwks.json"
 
 
 def _authorized_parties() -> set[str]:
@@ -74,25 +77,21 @@ def _authorized_parties() -> set[str]:
 # ---------------------------------------------------------------------------
 
 _JWKS_TTL_SECONDS = 3600.0
-_jwks_cache: dict[str, object] = {"keys": None, "fetched_at": 0.0}
+# Cache per JWKS URL so multiple issuers (dev + prod) don't clobber each other.
+_jwks_cache: dict[str, dict] = {}
 
 
-async def _fetch_jwks(*, force: bool = False) -> list[dict]:
+async def _fetch_jwks(url: str, *, force: bool = False) -> list[dict]:
     now = time.time()
-    cached = _jwks_cache["keys"]
+    entry = _jwks_cache.get(url)
+    cached = entry["keys"] if entry else None
     if (
         not force
         and cached is not None
-        and now - float(_jwks_cache["fetched_at"]) < _JWKS_TTL_SECONDS
+        and now - float(entry["fetched_at"]) < _JWKS_TTL_SECONDS
     ):
         return cached  # type: ignore[return-value]
 
-    url = _jwks_url()
-    if not url:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="CLERK_ISSUER (or CLERK_JWKS_URL) is not configured",
-        )
     try:
         async with httpx.AsyncClient(timeout=5.0) as http:
             resp = await http.get(url)
@@ -106,17 +105,16 @@ async def _fetch_jwks(*, force: bool = False) -> list[dict]:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"could not fetch Clerk JWKS: {e}",
         )
-    _jwks_cache["keys"] = keys
-    _jwks_cache["fetched_at"] = now
+    _jwks_cache[url] = {"keys": keys, "fetched_at": now}
     return keys
 
 
-async def _signing_key_for(kid: Optional[str]) -> dict:
-    keys = await _fetch_jwks()
+async def _signing_key_for(kid: Optional[str], url: str) -> dict:
+    keys = await _fetch_jwks(url)
     key = next((k for k in keys if k.get("kid") == kid), None)
     if key is None:
         # kid not in cache — likely a rotation; refetch once before failing.
-        keys = await _fetch_jwks(force=True)
+        keys = await _fetch_jwks(url, force=True)
         key = next((k for k in keys if k.get("kid") == kid), None)
     if key is None:
         raise HTTPException(
@@ -136,8 +134,35 @@ async def _verify_clerk_jwt(token: str) -> str:
             detail=f"malformed token: {e}",
         )
 
-    key = await _signing_key_for(header.get("kid"))
-    issuer = _clerk_issuer()
+    issuers = _clerk_issuers()
+    # Pick the configured issuer that matches the token's own `iss` claim, so
+    # the right instance's JWKS is used. With none configured (e.g. dev-header
+    # mode) issuer validation is skipped.
+    token_iss = None
+    try:
+        token_iss = jwt.get_unverified_claims(token).get("iss")
+    except JWTError:
+        pass
+    if token_iss:
+        token_iss = token_iss.rstrip("/")
+
+    if issuers:
+        issuer = token_iss if token_iss in issuers else None
+        if issuer is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="token issuer not allowed",
+            )
+    else:
+        issuer = None  # unconfigured — skip issuer check
+
+    jwks_url = _jwks_url_for(issuer) if issuer else os.environ.get("CLERK_JWKS_URL")
+    if not jwks_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="CLERK_ISSUER (or CLERK_JWKS_URL) is not configured",
+        )
+    key = await _signing_key_for(header.get("kid"), jwks_url)
     try:
         claims = jwt.decode(
             token,
