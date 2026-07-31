@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 # Bring the package onto sys.path before importing models.
 from badminton_rating.db.models import Base  # noqa: E402
+from badminton_rating.db.session import _prepare_url_and_connect_args  # noqa: E402
 
 
 config = context.config
@@ -30,11 +31,13 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Inject DATABASE_URL from env. Fall back to a local default so `alembic
-# current` etc. still work without env wiring.
-db_url = os.getenv(
+# current` etc. still work without env wiring. Normalize for asyncpg (strips
+# Neon's sslmode/channel_binding params, surfaces the SSL requirement).
+_raw_db_url = os.getenv(
     "DATABASE_URL",
     "postgresql+asyncpg://brs:brs@localhost:5432/brs",
 )
+db_url, _connect_args = _prepare_url_and_connect_args(_raw_db_url)
 config.set_main_option("sqlalchemy.url", db_url)
 
 target_metadata = Base.metadata
@@ -77,6 +80,7 @@ async def run_async_migrations() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=_connect_args,
     )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
