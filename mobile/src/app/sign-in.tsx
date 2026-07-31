@@ -3,7 +3,7 @@ import { Redirect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../../lib/theme";
@@ -70,10 +70,12 @@ export default function SignIn() {
           gap: spacing.lg,
         }}
       >
-        <Text style={{ fontSize: 40 }}>🏸</Text>
-        <Text style={{ fontSize: 30, fontWeight: "800", color: colors.text }}>
-          ShuttleRank
-        </Text>
+        <Image
+          source={require("../../assets/images/wordmark.png")}
+          style={{ width: 240, height: 240 * (183 / 1123) }}
+          resizeMode="contain"
+          accessibilityLabel="ShuttleRank"
+        />
         <Text
           style={{
             color: colors.textSecondary,

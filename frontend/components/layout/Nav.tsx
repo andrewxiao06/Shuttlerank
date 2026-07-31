@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
@@ -32,8 +33,15 @@ export function TopNav() {
   return (
     <header className="sticky top-0 z-30 hidden h-16 border-b border-border bg-background/95 backdrop-blur md:block">
       <nav className="mx-auto flex h-full max-w-5xl items-center justify-between gap-6 px-6">
-        <Link href="/" className="text-h3 font-semibold tracking-tight">
-          ShuttleRank
+        <Link href="/" className="flex items-center" aria-label="ShuttleRank home">
+          <Image
+            src="/brand/wordmark-black.png"
+            alt="ShuttleRank"
+            width={1123}
+            height={183}
+            priority
+            className="h-7 w-auto"
+          />
         </Link>
         <ul className="flex items-center gap-1">
           {LINKS.map((l) => {
