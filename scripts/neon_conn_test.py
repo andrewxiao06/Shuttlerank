@@ -30,16 +30,31 @@ async def attempt(label, **kw):
         print(f"{label}: FAIL {type(e).__name__}: {str(e)[:90]}")
 
 
+async def via_sqlalchemy():
+    """Replicate the real app path: helper -> create_async_engine."""
+    from sqlalchemy import text
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from badminton_rating.db.session import _prepare_url_and_connect_args
+
+    prepared_url, connect_args = _prepare_url_and_connect_args(
+        os.environ["DATABASE_URL"]
+    )
+    print(f"prepared_url={prepared_url}")
+    print(f"connect_args={connect_args}")
+    try:
+        eng = create_async_engine(prepared_url, connect_args=connect_args)
+        async with eng.connect() as conn:
+            val = await conn.scalar(text("SELECT 1"))
+        await eng.dispose()
+        print(f"5 sqlalchemy+helper: OK ({val})")
+    except Exception as e:  # noqa: BLE001
+        print(f"5 sqlalchemy+helper: FAIL {type(e).__name__}: {str(e)[:120]}")
+
+
 async def main():
     print(f"host={host}  endpoint_id={epid}")
     await attempt("1 ssl=ctx", ssl=ctx)
-    await attempt("2 ssl=require-str", ssl="require")
-    await attempt(
-        "3 ssl=ctx + endpoint-option",
-        ssl=ctx,
-        server_settings={"options": f"endpoint={epid}"},
-    )
-    await attempt("4 ssl=ctx + direct_tls", ssl=ctx, direct_tls=True)
+    await via_sqlalchemy()
 
 
 import asyncpg  # noqa: E402
