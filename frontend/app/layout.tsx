@@ -4,6 +4,7 @@ import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
 import { TopNav } from "@/components/layout/Nav";
 import { MobileTabBar } from "@/components/layout/MobileTabBar";
+import { AppBootGate } from "@/components/layout/AppBootGate";
 import { ProfileSetupBanner } from "@/components/onboarding/ProfileSetupBanner";
 import "./globals.css";
 
@@ -50,10 +51,12 @@ export default function RootLayout({
           }}
         >
           <Providers>
-            <TopNav />
-            <ProfileSetupBanner />
-            <div className="flex-1 pb-20 md:pb-0">{children}</div>
-            <MobileTabBar />
+            <AppBootGate>
+              <TopNav />
+              <ProfileSetupBanner />
+              <div className="flex-1 pb-20 md:pb-0">{children}</div>
+              <MobileTabBar />
+            </AppBootGate>
           </Providers>
         </ClerkProvider>
       </body>

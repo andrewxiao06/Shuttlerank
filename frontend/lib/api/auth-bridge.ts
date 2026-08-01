@@ -56,7 +56,7 @@ export function getUserId(): string | null {
  * token is ready. Production Clerk loads from a custom domain and can take
  * >1.5s cold, so the old 1.5s cap fired early and caused intermittent 401s.
  */
-export function waitForAuthReady(timeoutMs = 8000): Promise<void> {
+export function waitForAuthReady(timeoutMs = 3000): Promise<void> {
   if (authResolved) return Promise.resolve();
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
