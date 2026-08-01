@@ -50,6 +50,9 @@ def create_app() -> FastAPI:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+        # Cache CORS preflight for 24h so the browser stops sending an OPTIONS
+        # before every single API call (halves round-trips on repeat requests).
+        max_age=86400,
     )
 
     @app.get("/health", tags=["meta"])
