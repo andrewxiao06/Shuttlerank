@@ -1,7 +1,12 @@
+import { Suspense } from "react";
 import { LeaderboardView } from "./leaderboard-view";
 
-export const dynamic = "force-dynamic";
-
+// LeaderboardView reads useSearchParams (category/page state), so it needs a
+// Suspense boundary now that the page is statically prerendered.
 export default function LeaderboardPage() {
-  return <LeaderboardView />;
+  return (
+    <Suspense>
+      <LeaderboardView />
+    </Suspense>
+  );
 }

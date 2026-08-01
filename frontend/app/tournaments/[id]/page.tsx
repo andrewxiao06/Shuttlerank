@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import { TournamentDetailView } from "./tournament-detail-view";
 
-export const dynamic = "force-dynamic";
-
 export default async function TournamentDetailPage({
   params,
 }: {
