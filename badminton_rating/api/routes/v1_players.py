@@ -90,6 +90,17 @@ async def bootstrap_current_player(
     existing = (await session.execute(
         select(Player).where(Player.clerk_user_id == user_id)
     )).scalar_one_or_none()
+    if existing is None and body.email:
+        # Claim an existing player by verified email (dev→prod re-signin, or a
+        # pre-created profile) instead of creating a duplicate — this is what
+        # keeps returning accounts linked to their match history.
+        existing = (await session.execute(
+            select(Player).where(Player.email == body.email)
+        )).scalar_one_or_none()
+        if existing is not None:
+            existing.clerk_user_id = user_id
+            await session.commit()
+            await session.refresh(existing)
     if existing is None:
         existing = Player(
             clerk_user_id=user_id,
