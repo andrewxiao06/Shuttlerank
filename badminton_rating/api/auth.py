@@ -149,6 +149,11 @@ async def _verify_clerk_jwt(token: str) -> str:
     if issuers:
         issuer = token_iss if token_iss in issuers else None
         if issuer is None:
+            print(
+                f"AUTH401 issuer-not-allowed token_iss={token_iss!r} "
+                f"configured={issuers}",
+                flush=True,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="token issuer not allowed",
@@ -172,9 +177,14 @@ async def _verify_clerk_jwt(token: str) -> str:
             options={
                 "verify_aud": False,  # Clerk session tokens have no `aud`
                 "verify_iss": issuer is not None,
+                # Clerk session tokens live only ~60s. Allow 60s of leeway on
+                # exp/nbf so a token that expires in-flight or during a refresh
+                # gap isn't spuriously rejected (the intermittent 401s).
+                "leeway": 60,
             },
         )
     except JWTError as e:
+        print(f"AUTH401 invalid-token reason={e} token_iss={token_iss!r}", flush=True)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"invalid token: {e}",
