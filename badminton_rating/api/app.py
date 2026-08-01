@@ -8,8 +8,9 @@ production runs use the module-level `app` (read at `main.py`).
 from __future__ import annotations
 
 import os
+import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from badminton_rating.api.routes import (
@@ -54,6 +55,26 @@ def create_app() -> FastAPI:
         # before every single API call (halves round-trips on repeat requests).
         max_age=86400,
     )
+
+    # Request timing — adds an `X-Process-Time` header (visible in the browser
+    # Network tab → Response Headers) and logs the server-side duration of each
+    # request, so latency is measurable without guessing. `SLOW_REQUEST_MS`
+    # (default 500) controls which requests are flagged SLOW in the logs.
+    slow_ms = float(os.environ.get("SLOW_REQUEST_MS", "500"))
+
+    @app.middleware("http")
+    async def add_timing(request: Request, call_next):
+        start = time.perf_counter()
+        response = await call_next(request)
+        elapsed_ms = (time.perf_counter() - start) * 1000
+        response.headers["X-Process-Time"] = f"{elapsed_ms:.1f}ms"
+        tag = "SLOW " if elapsed_ms >= slow_ms else ""
+        print(
+            f"TIMING {tag}{request.method} {request.url.path} "
+            f"-> {elapsed_ms:.1f}ms",
+            flush=True,
+        )
+        return response
 
     @app.get("/health", tags=["meta"])
     async def health() -> dict:

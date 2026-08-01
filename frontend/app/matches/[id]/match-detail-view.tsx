@@ -63,7 +63,14 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
   const meIsParticipant =
     meQ.data != null &&
     match.participants.some((p) => p.player_id === meQ.data.id);
-  const canValidate = match.status === "pending" && meIsParticipant;
+  // The submitter auto-approves when they submit, so they can't approve again
+  // (the backend 409s "already validated"). Only the OTHER participants see
+  // the approve/dispute controls.
+  const iSubmitted =
+    meQ.data?.clerk_user_id != null &&
+    match.submitted_by_user_id === meQ.data.clerk_user_id;
+  const canValidate =
+    match.status === "pending" && meIsParticipant && !iSubmitted;
 
   return (
     <main className="mx-auto w-full max-w-3xl px-4 pb-24 pt-6 sm:px-6">
@@ -127,7 +134,17 @@ export function MatchDetailView({ matchId }: { matchId: number }) {
               Approve
             </button>
           </div>
+          {validate.isError ? (
+            <p className="text-caption text-danger sm:w-full" role="alert">
+              {(validate.error as Error).message}
+            </p>
+          ) : null}
         </section>
+      ) : match.status === "pending" && iSubmitted ? (
+        <p className="mt-4 rounded-lg border border-border bg-surface-muted/40 p-4 text-caption text-text-secondary">
+          You submitted this match, so it&apos;s already approved on your side —
+          waiting for the other player to approve.
+        </p>
       ) : null}
 
       {/* Per-participant rating changes */}
