@@ -5,7 +5,22 @@ import { getPlayer, listPlayerMatches } from "@/lib/api";
 import { FormatRatings } from "@/components/rating/FormatRatings";
 import { MatchHistory } from "@/components/player/MatchHistory";
 import { Avatar } from "@/components/player/Avatar";
-import { RatingHistoryChart } from "@/components/player/RatingHistoryChart";
+import dynamic from "next/dynamic";
+
+// recharts is ~300KB — lazy-load so it's not in the initial page bundle and
+// doesn't block first paint. ssr:false since the chart is client-only.
+const RatingHistoryChart = dynamic(
+  () =>
+    import("@/components/player/RatingHistoryChart").then(
+      (m) => m.RatingHistoryChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-44 animate-pulse rounded-lg bg-surface-muted" />
+    ),
+  },
+);
 
 /*
  * Public profile view — read-only. "Your rating is the hero": the hero card
