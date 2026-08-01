@@ -9,7 +9,23 @@ import { PlayerGenderSchema, type PlayerGender } from "@/lib/api/types";
 import { FormatRatings } from "@/components/rating/FormatRatings";
 import { Avatar } from "@/components/player/Avatar";
 import { MatchHistory } from "@/components/player/MatchHistory";
-import { RatingHistoryChart } from "@/components/player/RatingHistoryChart";
+import dynamic from "next/dynamic";
+
+// recharts is ~300KB — lazy-load it so it's not in the initial page bundle and
+// doesn't block first paint (the rating/tier render immediately; the chart
+// streams in after). ssr:false since the chart is client-only anyway.
+const RatingHistoryChart = dynamic(
+  () =>
+    import("@/components/player/RatingHistoryChart").then(
+      (m) => m.RatingHistoryChart,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-44 animate-pulse rounded-lg bg-surface-muted" />
+    ),
+  },
+);
 import { listPlayerMatches } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
