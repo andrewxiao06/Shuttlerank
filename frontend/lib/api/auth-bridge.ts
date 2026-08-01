@@ -50,9 +50,13 @@ export function getUserId(): string | null {
  * avoid firing API calls in the auth race window — a fresh tab would
  * otherwise emit a 401 before Clerk's `useAuth()` hook hydrates.
  *
- * Capped at `timeoutMs` so a stuck Clerk can't deadlock the app.
+ * Capped at `timeoutMs` so a stuck Clerk can't deadlock the app. This
+ * resolves the instant Clerk hydrates (setUserId fires), so a higher cap
+ * doesn't slow normal loads — it only prevents firing requests before the
+ * token is ready. Production Clerk loads from a custom domain and can take
+ * >1.5s cold, so the old 1.5s cap fired early and caused intermittent 401s.
  */
-export function waitForAuthReady(timeoutMs = 1500): Promise<void> {
+export function waitForAuthReady(timeoutMs = 8000): Promise<void> {
   if (authResolved) return Promise.resolve();
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
