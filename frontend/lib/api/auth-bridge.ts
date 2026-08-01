@@ -33,11 +33,20 @@ export function setUserId(id: string | null): void {
 
 export async function getAuthToken(): Promise<string | null> {
   if (!getToken) return null;
-  try {
-    return await getToken();
-  } catch {
-    return null;
+  // Clerk mints the session token lazily; right after boot getToken() can
+  // return null for a moment. Retry a few times (short) so the first requests
+  // don't fire tokenless and 401 — without blocking the whole app on it.
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const token = await getToken();
+      if (token) return token;
+    } catch {
+      /* fall through to retry */
+    }
+    if (!getToken) return null; // signed out mid-wait
+    await new Promise((r) => setTimeout(r, 150));
   }
+  return null;
 }
 
 export function getUserId(): string | null {
