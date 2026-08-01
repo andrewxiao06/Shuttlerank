@@ -131,17 +131,20 @@ export function Providers({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: 30_000,
             refetchOnWindowFocus: false,
-            // Don't retry client/auth errors (401/403/404) — a retry can't
-            // fix them and React Query's default 3x backoff turns a transient
-            // 401 into ~7s of "loading". Retry only server/network blips.
+            // React Query's default 3x exponential backoff turned a transient
+            // 401 into ~7s of "loading". A 401 right after load can be an auth
+            // race straggler (Clerk finished hydrating a beat late) — retry it
+            // a couple times *quickly*. Other 4xx won't fix via retry, so fail
+            // fast. Server/network blips get a short retry.
             retry: (failureCount, error) => {
               const status = (error as { status?: number })?.status;
+              if (status === 401) return failureCount < 2;
               if (status !== undefined && status >= 400 && status < 500) {
                 return false;
               }
               return failureCount < 2;
             },
-            retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2000),
+            retryDelay: (attempt) => Math.min(400 * 2 ** attempt, 1500),
           },
         },
       }),
