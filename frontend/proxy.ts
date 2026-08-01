@@ -1,28 +1,27 @@
 import { clerkMiddleware } from "@clerk/nextjs/server";
 
 /*
- * Clerk middleware — establishes auth context, but intentionally does NOT
- * server-side redirect ("protect") the app routes.
+ * Clerk middleware — scoped to ONLY the routes that need server-side Clerk.
  *
- * Why: production Clerk runs a strict cross-domain session handshake. When the
- * served domain and Clerk's configured domain differ (e.g. Vercel serving
- * `www.` while Clerk is bound to the apex), a server-side `auth.protect()`
- * can't confirm the session on the "wrong" domain and redirects to sign-in —
- * which redirects back — an infinite loop that blanks protected pages
- * (Submit, Inbox). The client-side Clerk session works fine, and every API
- * endpoint independently requires a valid Clerk token (401 otherwise), so
- * gating is enforced without a fragile server-side redirect.
+ * The app is fully client-side auth (ClerkProvider + useAuth/useUser hooks);
+ * no page uses server-side `auth()`/`currentUser()`. Running clerkMiddleware
+ * on every page made each navigation's RSC request pass through Clerk's
+ * production handshake, which returns a 307 redirect — and a 307 can't be
+ * prefetched, so Next.js re-fetched every page live through the handshake on
+ * each tab switch (the ~3s stall + freeze on bursts).
  *
- * The proper alignment fix is to make the served domain match Clerk's domain
- * (apex vs www) in Vercel's domain settings; removing the redirect here keeps
- * the app usable regardless.
+ * Scoping the matcher to Clerk's own routes (sign-in/up, the __clerk handshake
+ * callbacks) lets the app's static pages be prefetched and navigated instantly.
+ * Client-side Clerk manages the session independently of this middleware, and
+ * the API (separate FastAPI service) enforces auth on every endpoint.
  */
 export default clerkMiddleware();
 
 export const config = {
   matcher: [
-    "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
-    "/(api|trpc)(.*)",
+    "/sign-in(.*)",
+    "/sign-up(.*)",
     "/__clerk/(.*)",
+    "/(api|trpc)(.*)",
   ],
 };
