@@ -65,6 +65,16 @@ async def _handle_user_created(
         if event.data.email_addresses
         else None
     )
+    # Claim an existing player by verified email — links a returning person
+    # (e.g. dev→prod, or an organizer-precreated profile) to their record
+    # instead of creating a duplicate. Clerk emails are verified.
+    if email:
+        by_email = (await session.execute(
+            select(Player).where(Player.email == email)
+        )).scalar_one_or_none()
+        if by_email is not None:
+            by_email.clerk_user_id = event.data.id
+            return
     name = " ".join(
         part for part in (event.data.first_name, event.data.last_name) if part
     ) or (email.split("@")[0] if email else event.data.id)
