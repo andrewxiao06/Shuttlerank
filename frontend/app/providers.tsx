@@ -36,7 +36,18 @@ function ClerkTokenBridge() {
     if (!isLoaded) return;
     if (isSignedIn) {
       setTokenGetter(() => getToken());
-      setUserId(userId ?? null);
+      // Mint the session token BEFORE releasing pending API calls. Clerk's
+      // isLoaded=true only means the client booted, NOT that a token exists
+      // yet — releasing early makes the first requests fire tokenless and
+      // 401, then retry with backoff (the "extra" seconds). setUserId()
+      // releases waitForAuthReady(), so only call it once we have a token.
+      let cancelled = false;
+      getToken().finally(() => {
+        if (!cancelled) setUserId(userId ?? null);
+      });
+      return () => {
+        cancelled = true;
+      };
     } else {
       setTokenGetter(null);
       setUserId(null);
