@@ -8,7 +8,13 @@ import {
 } from "@tanstack/react-query";
 import { ThemeProvider } from "next-themes";
 import { useAuth, useUser } from "@clerk/nextjs";
-import { bootstrapMe, getMe } from "@/lib/api";
+import {
+  bootstrapMe,
+  getLeaderboard,
+  getMe,
+  listPendingForMe,
+  listTournaments,
+} from "@/lib/api";
 import { setTokenGetter, setUserId } from "@/lib/api/auth-bridge";
 
 /*
@@ -123,13 +129,53 @@ function PlayerAutoBootstrap() {
   return null;
 }
 
+/*
+ * Warm the caches for the other tabs the moment the app loads, so the first
+ * click into Leaderboard / Tournaments / Inbox is instant instead of showing
+ * a loading state. Next already prefetches the route JS (static pages); this
+ * prefetches their *data*. Fires once per signed-in session.
+ */
+function RoutePrefetch() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const qc = useQueryClient();
+  const done = useRef(false);
+
+  useEffect(() => {
+    if (!isLoaded || !isSignedIn || done.current) return;
+    done.current = true;
+    void qc.prefetchQuery({
+      queryKey: ["tournaments"],
+      queryFn: listTournaments,
+    });
+    void qc.prefetchQuery({
+      queryKey: ["pending"],
+      queryFn: () => listPendingForMe(),
+    });
+    void qc.prefetchQuery({
+      queryKey: ["leaderboard", 0, false, "singles"],
+      queryFn: () =>
+        getLeaderboard({
+          limit: 25,
+          offset: 0,
+          hideProvisional: false,
+          category: "singles",
+        }),
+    });
+  }, [isLoaded, isSignedIn, qc]);
+
+  return null;
+}
+
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 30_000,
+            // Hold data fresh for 5 min so navigating between tabs never
+            // refetches within a session — instant, no flash of loading.
+            staleTime: 5 * 60_000,
+            gcTime: 30 * 60_000,
             refetchOnWindowFocus: false,
             // React Query's default 3x exponential backoff turned a transient
             // 401 into ~7s of "loading". A 401 right after load can be an auth
@@ -156,6 +202,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
         <ClerkTokenBridge />
         <QueryCacheUserScope />
         <PlayerAutoBootstrap />
+        <RoutePrefetch />
         {children}
       </QueryClientProvider>
     </ThemeProvider>
