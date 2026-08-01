@@ -13,6 +13,7 @@ import {
   getLeaderboard,
   getMe,
   listPendingForMe,
+  listPlayerMatches,
   listTournaments,
 } from "@/lib/api";
 import { setTokenGetter, setUserId } from "@/lib/api/auth-bridge";
@@ -161,6 +162,15 @@ function RoutePrefetch() {
           category: "singles",
         }),
     });
+    // Profile (/me) needs the player's match history — warm it once we know
+    // the player id (the ["me"] query is already fetched by the nav/banner).
+    void (async () => {
+      const me = await qc.ensureQueryData({ queryKey: ["me"], queryFn: getMe });
+      void qc.prefetchQuery({
+        queryKey: ["matches", me.id],
+        queryFn: () => listPlayerMatches(me.id),
+      });
+    })();
   }, [isLoaded, isSignedIn, qc]);
 
   return null;
