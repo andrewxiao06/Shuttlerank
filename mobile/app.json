@@ -7,6 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "shuttlerank",
     "userInterfaceStyle": "automatic",
+    "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "org.shuttlerank.app",
       "supportsTablet": true,
@@ -43,8 +44,7 @@
       "expo-web-browser"
     ],
     "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+      "typedRoutes": true
     },
     "extra": {
       "router": {},
