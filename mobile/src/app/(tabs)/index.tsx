@@ -115,8 +115,24 @@ function HomeBody({
       </View>
 
       {/* Sign out */}
-      <Pressable onPress={onSignOut} style={{ alignItems: "center", paddingVertical: spacing.md }}>
-        <Text style={{ color: colors.textMuted }}>Sign out</Text>
+      <Pressable
+        onPress={onSignOut}
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: spacing.sm,
+          marginTop: spacing.md,
+          paddingVertical: spacing.lg,
+          borderRadius: radius.md,
+          borderWidth: 1,
+          borderColor: colors.danger,
+        }}
+      >
+        <Ionicons name="log-out-outline" size={22} color={colors.danger} />
+        <Text style={{ color: colors.danger, fontSize: 16, fontWeight: "700" }}>
+          Sign out
+        </Text>
       </Pressable>
     </>
   );

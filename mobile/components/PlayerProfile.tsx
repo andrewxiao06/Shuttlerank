@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Avatar } from "./ui/Avatar";
 import { Card } from "./ui/Card";
 import { AsyncBoundary } from "./ui/AsyncBoundary";
@@ -27,10 +28,12 @@ export function PlayerProfile({
   player,
   playerId,
   onEdit,
+  onSignOut,
 }: {
   player?: PlayerMe; // pass when already loaded (the Profile tab / "me")
   playerId?: number; // pass to fetch a specific player
   onEdit?: () => void; // when set, shows an "Edit" button (your own profile)
+  onSignOut?: () => void; // when set, shows a "Sign out" button (your own profile)
 }) {
   // When given a player object use it; otherwise fetch by id.
   const playerQ = useQuery({
@@ -60,6 +63,7 @@ export function PlayerProfile({
           matches={matchesQ.data ?? []}
           matchesLoading={matchesQ.isPending}
           onEdit={onEdit}
+          onSignOut={onSignOut}
         />
       ) : null}
     </AsyncBoundary>
@@ -71,11 +75,13 @@ function Body({
   matches,
   matchesLoading,
   onEdit,
+  onSignOut,
 }: {
   player: PlayerMe;
   matches: CategoryMatch[];
   matchesLoading: boolean;
   onEdit?: () => void;
+  onSignOut?: () => void;
 }) {
   const [showAll, setShowAll] = useState(false);
   const [filter, setFilter] = useState<MatchFilter>("all");
@@ -200,6 +206,28 @@ function Body({
           ))
         )}
       </View>
+
+      {/* Sign out — only on your own profile (when onSignOut is provided) */}
+      {onSignOut ? (
+        <Pressable
+          onPress={onSignOut}
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: spacing.sm,
+            paddingVertical: spacing.lg,
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: colors.danger,
+          }}
+        >
+          <Ionicons name="log-out-outline" size={22} color={colors.danger} />
+          <Text style={{ color: colors.danger, fontSize: 16, fontWeight: "700" }}>
+            Sign out
+          </Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   );
 }

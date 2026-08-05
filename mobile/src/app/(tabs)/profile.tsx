@@ -1,3 +1,4 @@
+import { useAuth } from "@clerk/clerk-expo";
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import { Screen } from "../../../components/ui/Screen";
@@ -11,6 +12,7 @@ import { getMe } from "../../../lib/api/client";
  */
 export default function Profile() {
   const router = useRouter();
+  const { signOut } = useAuth();
   const meQ = useQuery({ queryKey: ["me"], queryFn: getMe });
 
   return (
@@ -25,6 +27,7 @@ export default function Profile() {
           <PlayerProfile
             player={meQ.data}
             onEdit={() => router.push("/edit-profile")}
+            onSignOut={() => signOut()}
           />
         ) : null}
       </AsyncBoundary>

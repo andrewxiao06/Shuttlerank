@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "shuttlerank",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
     "ios": {
       "bundleIdentifier": "org.shuttlerank.app",
       "supportsTablet": true,

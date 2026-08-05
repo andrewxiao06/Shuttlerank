@@ -1,9 +1,19 @@
-import { useAuth, useSSO } from "@clerk/clerk-expo";
+import { useAuth, useSignIn, useSignUp, useSSO } from "@clerk/clerk-expo";
 import { Redirect } from "expo-router";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../../lib/theme";
@@ -22,17 +32,36 @@ function useWarmUpBrowser() {
 // Required on native so the auth session can complete.
 WebBrowser.maybeCompleteAuthSession();
 
+type Mode = "signIn" | "signUp";
+
 /*
- * Sign-in screen. Google OAuth (matches how the web accounts were created).
- * On success, Clerk sets the active session and the (tabs) gate lets the
- * user through; AuthSync then bootstraps their Player row.
+ * Sign-in / sign-up screen. Two ways in, mirroring the web:
+ *   1. Google OAuth (how the original accounts were made)
+ *   2. Email + password — sign in, or sign up with an emailed 6-digit code
+ * On success Clerk sets the active session and the (tabs) gate lets the user
+ * through; AuthSync then bootstraps their Player row.
  */
 export default function SignIn() {
   useWarmUpBrowser();
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded: authLoaded, isSignedIn } = useAuth();
   const { startSSOFlow } = useSSO();
+  const { isLoaded: siLoaded, signIn, setActive: setActiveSignIn } = useSignIn();
+  const { isLoaded: suLoaded, signUp, setActive: setActiveSignUp } = useSignUp();
+
+  const [mode, setMode] = useState<Mode>("signIn");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [pendingVerification, setPendingVerification] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const clerkError = (e: unknown) =>
+    (e as { errors?: { message?: string; longMessage?: string }[] })?.errors?.[0]
+      ?.longMessage ??
+    (e as { errors?: { message?: string }[] })?.errors?.[0]?.message ??
+    (e as Error)?.message ??
+    "Something went wrong. Please try again.";
 
   const onGoogle = useCallback(async () => {
     setBusy(true);
@@ -44,88 +73,258 @@ export default function SignIn() {
       });
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
-        // The (tabs) gate now sees isSignedIn === true and renders the app.
       }
     } catch (e) {
-      setError((e as Error)?.message ?? "Sign-in failed. Please try again.");
+      setError(clerkError(e));
     } finally {
       setBusy(false);
     }
   }, [startSSOFlow]);
 
-  // Once authenticated, leave the sign-in screen for the app. Handles both a
-  // fresh sign-in and the "already signed in" case. MUST come after every
-  // hook above — an early return before a hook changes the hook count and
-  // crashes with "rendered fewer hooks than expected".
-  if (isLoaded && isSignedIn) return <Redirect href="/" />;
+  const onEmailSignIn = useCallback(async () => {
+    if (!siLoaded || !signIn) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const attempt = await signIn.create({ identifier: email.trim(), password });
+      if (attempt.status === "complete") {
+        await setActiveSignIn({ session: attempt.createdSessionId });
+      } else {
+        setError("Additional verification is required. Try Google sign-in.");
+      }
+    } catch (e) {
+      setError(clerkError(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [siLoaded, signIn, email, password, setActiveSignIn]);
+
+  const onEmailSignUp = useCallback(async () => {
+    if (!suLoaded || !signUp) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await signUp.create({ emailAddress: email.trim(), password });
+      await signUp.prepareEmailAddressVerification({ strategy: "email_code" });
+      setPendingVerification(true);
+    } catch (e) {
+      setError(clerkError(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [suLoaded, signUp, email, password]);
+
+  const onVerify = useCallback(async () => {
+    if (!suLoaded || !signUp) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const attempt = await signUp.attemptEmailAddressVerification({ code: code.trim() });
+      if (attempt.status === "complete") {
+        await setActiveSignUp({ session: attempt.createdSessionId });
+      } else {
+        setError("That code didn't verify. Check your email and try again.");
+      }
+    } catch (e) {
+      setError(clerkError(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [suLoaded, signUp, code, setActiveSignUp]);
+
+  // Once authenticated, leave for the app. MUST come after every hook above.
+  if (authLoaded && isSignedIn) return <Redirect href="/" />;
+
+  const canSubmit = email.trim().length > 3 && password.length >= 8 && !busy;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View
-        style={{
-          flex: 1,
-          alignItems: "center",
-          justifyContent: "center",
-          padding: spacing.xl,
-          gap: spacing.lg,
-        }}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        <Image
-          source={require("../../assets/images/wordmark.png")}
-          style={{ width: 240, height: 240 * (183 / 1123) }}
-          resizeMode="contain"
-          accessibilityLabel="ShuttleRank"
-        />
-        <Text
-          style={{
-            color: colors.textSecondary,
-            textAlign: "center",
-            marginBottom: spacing.lg,
-          }}
-        >
-          Badminton, rated. Sign in to track your rating and submit matches.
-        </Text>
-
-        <Pressable
-          onPress={onGoogle}
-          disabled={busy}
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
             justifyContent: "center",
-            gap: spacing.sm,
-            backgroundColor: colors.primary,
-            paddingVertical: spacing.md,
-            paddingHorizontal: spacing.xl,
-            borderRadius: radius.md,
-            width: "100%",
-            opacity: busy ? 0.6 : 1,
+            padding: spacing.xl,
+            gap: spacing.lg,
           }}
+          keyboardShouldPersistTaps="handled"
         >
-          {busy ? (
-            <ActivityIndicator color={colors.onPrimary} />
+          <Image
+            source={require("../../assets/images/wordmark.png")}
+            style={{ width: 220, height: 220 * (183 / 1123), alignSelf: "center" }}
+            resizeMode="contain"
+            accessibilityLabel="ShuttleRank"
+          />
+
+          {pendingVerification ? (
+            <>
+              <Text style={{ color: colors.textSecondary, textAlign: "center" }}>
+                We emailed a 6-digit code to {email.trim()}. Enter it below.
+              </Text>
+              <TextInput
+                value={code}
+                onChangeText={setCode}
+                placeholder="123456"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="number-pad"
+                autoFocus
+                style={inputStyle}
+              />
+              <PrimaryButton
+                label="Verify email"
+                busy={busy}
+                disabled={code.trim().length < 6 || busy}
+                onPress={onVerify}
+              />
+              <Pressable
+                onPress={() => {
+                  setPendingVerification(false);
+                  setCode("");
+                  setError(null);
+                }}
+                style={{ alignItems: "center", paddingVertical: spacing.sm }}
+              >
+                <Text style={{ color: colors.textMuted }}>Back</Text>
+              </Pressable>
+            </>
           ) : (
             <>
-              <Ionicons name="logo-google" size={20} color={colors.onPrimary} />
-              <Text
+              <Text style={{ color: colors.textSecondary, textAlign: "center" }}>
+                Badminton, rated. Sign in to track your rating and submit matches.
+              </Text>
+
+              {/* Google */}
+              <Pressable
+                onPress={onGoogle}
+                disabled={busy}
                 style={{
-                  color: colors.onPrimary,
-                  fontSize: 16,
-                  fontWeight: "600",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: spacing.sm,
+                  backgroundColor: colors.primary,
+                  paddingVertical: spacing.md,
+                  paddingHorizontal: spacing.xl,
+                  borderRadius: radius.md,
+                  opacity: busy ? 0.6 : 1,
                 }}
               >
-                Continue with Google
-              </Text>
+                {busy ? (
+                  <ActivityIndicator color={colors.onPrimary} />
+                ) : (
+                  <>
+                    <Ionicons name="logo-google" size={20} color={colors.onPrimary} />
+                    <Text style={{ color: colors.onPrimary, fontSize: 16, fontWeight: "600" }}>
+                      Continue with Google
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+
+              {/* Divider */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ color: colors.textMuted, fontSize: 12 }}>OR</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+              </View>
+
+              {/* Email + password */}
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder="Email"
+                placeholderTextColor={colors.textMuted}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                style={inputStyle}
+              />
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Password (8+ characters)"
+                placeholderTextColor={colors.textMuted}
+                secureTextEntry
+                autoCapitalize="none"
+                textContentType={mode === "signUp" ? "newPassword" : "password"}
+                style={inputStyle}
+              />
+
+              <PrimaryButton
+                label={mode === "signIn" ? "Sign in" : "Create account"}
+                busy={busy}
+                disabled={!canSubmit}
+                onPress={mode === "signIn" ? onEmailSignIn : onEmailSignUp}
+              />
+
+              <Pressable
+                onPress={() => {
+                  setMode((m) => (m === "signIn" ? "signUp" : "signIn"));
+                  setError(null);
+                }}
+                style={{ alignItems: "center", paddingVertical: spacing.sm }}
+              >
+                <Text style={{ color: colors.primary, fontWeight: "600" }}>
+                  {mode === "signIn"
+                    ? "New here? Create an account"
+                    : "Already have an account? Sign in"}
+                </Text>
+              </Pressable>
             </>
           )}
-        </Pressable>
 
-        {error ? (
-          <Text style={{ color: colors.danger, textAlign: "center" }}>
-            {error}
-          </Text>
-        ) : null}
-      </View>
+          {error ? (
+            <Text style={{ color: colors.danger, textAlign: "center" }}>{error}</Text>
+          ) : null}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+const inputStyle = {
+  borderWidth: 1,
+  borderColor: colors.border,
+  borderRadius: radius.md,
+  paddingVertical: spacing.md,
+  paddingHorizontal: spacing.md,
+  fontSize: 16,
+  color: colors.text,
+  backgroundColor: colors.surface,
+} as const;
+
+function PrimaryButton({
+  label,
+  busy,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={{
+        backgroundColor: colors.primary,
+        paddingVertical: spacing.md,
+        borderRadius: radius.md,
+        alignItems: "center",
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      {busy ? (
+        <ActivityIndicator color={colors.onPrimary} />
+      ) : (
+        <Text style={{ color: colors.onPrimary, fontSize: 16, fontWeight: "600" }}>{label}</Text>
+      )}
+    </Pressable>
   );
 }
