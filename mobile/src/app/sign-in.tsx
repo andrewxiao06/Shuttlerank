@@ -67,12 +67,19 @@ export default function SignIn() {
     setBusy(true);
     setError(null);
     try {
+      // MUST have a path — a bare `shuttlerank://` mangles the
+      // `?rotating_token_nonce=…` Clerk appends on the OAuth callback, which
+      // drops the nonce and makes signIn.reload 401 with "signed_out".
+      // `sso-callback` is also Clerk useSSO's own default path.
+      const redirectUrl = AuthSession.makeRedirectUri({ path: "sso-callback" });
       const { createdSessionId, setActive } = await startSSOFlow({
         strategy: "oauth_google",
-        redirectUrl: AuthSession.makeRedirectUri(),
+        redirectUrl,
       });
       if (createdSessionId && setActive) {
         await setActive({ session: createdSessionId });
+      } else {
+        setError("Sign-in didn't complete. Please try again.");
       }
     } catch (e) {
       setError(clerkError(e));
