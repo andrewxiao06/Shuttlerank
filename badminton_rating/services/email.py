@@ -11,8 +11,8 @@ Env:
   EMAIL_FROM       From header, e.g. "ShuttleRank <onboarding@resend.dev>".
                    Resend's onboarding@resend.dev works without a verified
                    domain — fine until you add your own.
-  APP_URL          Public web URL used to build links in emails (the Vercel
-                   origin), e.g. https://dubr-sepia.vercel.app
+  APP_URL          Public web URL used to build links in emails,
+                   e.g. https://shuttlerank.org
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def email_enabled() -> bool:
 
 
 def app_url() -> str:
-    return os.environ.get("APP_URL", "https://dubr-sepia.vercel.app").rstrip("/")
+    return os.environ.get("APP_URL", "https://shuttlerank.org").rstrip("/")
 
 
 async def send_email(*, to: str, subject: str, html: str) -> bool:
