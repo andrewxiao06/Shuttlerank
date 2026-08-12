@@ -7,8 +7,12 @@
 #
 # Until you own a domain: comment out the block below and use the :80 block at
 # the bottom to test over plain HTTP against the EC2 public IP.
+#
+# Serves the primary API_DOMAIN (api.shuttlerank.org) and keeps the legacy
+# dubr.mooo.com alive during the cutover so already-shipped clients keep working.
+# Caddy provisions a separate Let's Encrypt cert for each.
 
-{$API_DOMAIN} {
+{$API_DOMAIN} dubr.mooo.com {
 	encode gzip
 	reverse_proxy api:8000
 
