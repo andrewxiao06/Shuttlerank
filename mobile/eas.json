@@ -9,21 +9,21 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuc2h1dHRsZXJhbmsub3JnJA",
-        "EXPO_PUBLIC_API_BASE_URL": "https://dubr.mooo.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.shuttlerank.org"
       }
     },
     "preview": {
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuc2h1dHRsZXJhbmsub3JnJA",
-        "EXPO_PUBLIC_API_BASE_URL": "https://dubr.mooo.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.shuttlerank.org"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuc2h1dHRsZXJhbmsub3JnJA",
-        "EXPO_PUBLIC_API_BASE_URL": "https://dubr.mooo.com"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.shuttlerank.org"
       }
     }
   },
