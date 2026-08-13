@@ -15,7 +15,21 @@ See `CLAUDE.md` for full algorithm documentation and design rationale.
 
 ## Stack
 
-Python · FastAPI · PostgreSQL · SQLAlchemy (async) · Alembic · Redis · Docker
+Python · FastAPI · PostgreSQL (Neon) · SQLAlchemy (async) · Alembic · Docker · Caddy · Next.js (Vercel) · Expo/React Native · Clerk
+
+## Documentation
+
+Start here to (re)load the whole system:
+
+| Doc | What it covers |
+|---|---|
+| [`ARCHITECTURE.md`](./ARCHITECTURE.md) | **The connective reference** — how every service fits, request lifecycle, core-feature *logic*, the bottlenecks that bit us + fixes, scaling posture, interview talking points. |
+| [`CLAUDE.md`](./CLAUDE.md) | Rating-engine spec — full Glicko-2 + tanh math, tiers, deploy notes. |
+| [`PLAN.md`](./PLAN.md) | V1 roadmap — schema, validation flow, tournaments, phases. |
+| [`PUSH.md`](./PUSH.md) | Push notifications — data flow, files, setup + test steps. |
+| [`DEPLOY.md`](./DEPLOY.md) | Ops — EC2 + Docker Compose deploy. |
+| [`MOBILE.md`](./MOBILE.md) | The Expo app. |
+| [`DESIGN.md`](./DESIGN.md) | Visual system (tokens, components). |
 
 ## Running locally
 
