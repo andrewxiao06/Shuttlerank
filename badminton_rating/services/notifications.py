@@ -20,11 +20,12 @@ from __future__ import annotations
 import logging
 from typing import Sequence
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from badminton_rating.db.models import Match, Player, Team
+from badminton_rating.db.models import Match, Player, PushToken, Team
 from badminton_rating.services.email import app_url, email_enabled, send_email
+from badminton_rating.services.push import send_push
 
 logger = logging.getLogger("shuttlerank.notifications")
 
@@ -63,10 +64,6 @@ async def notify_pending_match(session: AsyncSession, match: Match) -> int:
     Returns the number of emails attempted (0 when email is disabled). Never
     raises.
     """
-    if not email_enabled():
-        logger.info("notifications: email disabled, skipping match %s", match.id)
-        return 0
-
     try:
         participants = list(match.participants)
         ids = [p.player_id for p in participants]
@@ -90,22 +87,72 @@ async def notify_pending_match(session: AsyncSession, match: Match) -> int:
         )
         submitter_name = _display_name(submitter) if submitter else "Someone"
 
+        # Everyone who needs to act = participants except the submitter.
+        recipients = [
+            p for p in players.values()
+            if p.clerk_user_id != match.submitted_by_user_id
+        ]
+
+        # --- Email channel (only if Resend is configured) ---
         sent = 0
-        for p in players.values():
-            # Skip the submitter (already approved) and anyone without an email.
-            if p.clerk_user_id == match.submitted_by_user_id or not p.email:
-                continue
-            await send_email(
-                to=p.email,
-                subject="A ShuttleRank match needs your approval",
-                html=_pending_email_html(
-                    recipient_name=_display_name(p),
-                    submitter_name=submitter_name,
-                    summary=summary,
-                ),
-            )
-            sent += 1
+        if email_enabled():
+            for p in recipients:
+                if not p.email:
+                    continue
+                await send_email(
+                    to=p.email,
+                    subject="A ShuttleRank match needs your approval",
+                    html=_pending_email_html(
+                        recipient_name=_display_name(p),
+                        submitter_name=submitter_name,
+                        summary=summary,
+                    ),
+                )
+                sent += 1
+        else:
+            logger.info("notifications: email disabled, skipping emails for match %s", match.id)
+
+        # --- Push channel (all recipients' registered devices) ---
+        await _push_pending_match(session, [p.id for p in recipients], submitter_name, summary, match.id)
+
         return sent
     except Exception as e:  # noqa: BLE001 — notifications must never break submit
         logger.warning("notify_pending_match failed for match %s: %s", match.id, e)
         return 0
+
+
+async def _push_pending_match(
+    session: AsyncSession,
+    recipient_player_ids: list[int],
+    submitter_name: str,
+    summary: str,
+    match_id: int,
+) -> None:
+    """
+    Push "a match needs your approval" to every recipient's registered devices.
+
+    `data.matchId` lets the app deep-link straight to the match when the user
+    taps the notification. Best-effort — prunes tokens Expo says are dead and
+    never raises (its own guard, so a push failure can't undo emails that
+    already sent).
+    """
+    if not recipient_player_ids:
+        return
+    try:
+        rows = (await session.execute(
+            select(PushToken).where(PushToken.player_id.in_(recipient_player_ids))
+        )).scalars().all()
+        tokens = [r.token for r in rows]
+        if not tokens:
+            return
+        dead = await send_push(
+            tokens,
+            title="🏸 Match needs your approval",
+            body=f"{submitter_name} submitted: {summary}",
+            data={"type": "match_pending", "matchId": match_id},
+        )
+        if dead:
+            await session.execute(delete(PushToken).where(PushToken.token.in_(dead)))
+            await session.commit()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("push for match %s failed: %s", match_id, e)
