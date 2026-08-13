@@ -5,6 +5,7 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryProvider } from "../../lib/query";
 import { AuthSync } from "../../lib/auth-sync";
+import { PushSync } from "../../lib/push-sync";
 
 // Root layout. Order matters: ClerkProvider (auth) → QueryProvider (data) →
 // AuthSync (bridges Clerk into the API client + bootstraps the player) →
@@ -17,6 +18,7 @@ export default function RootLayout() {
       <QueryProvider>
         <SafeAreaProvider>
           <AuthSync />
+          <PushSync />
           <StatusBar style="dark" />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(tabs)" />
