@@ -143,6 +143,27 @@ export function listPendingForMe(): Promise<CategoryMatch[]> {
   return request("/v1/matches/inbox/pending", z.array(CategoryMatchSchema));
 }
 
+// ---------------------------------------------------------------------------
+// Push tokens — register this device so the backend can notify it when a
+// match needs approval. Both return 204 (no body).
+// ---------------------------------------------------------------------------
+
+export async function registerPushToken(
+  token: string,
+  platform: string,
+): Promise<void> {
+  await request("/v1/push-tokens", z.void(), {
+    method: "POST",
+    body: { token, platform },
+  });
+}
+
+export async function unregisterPushToken(token: string): Promise<void> {
+  await request(`/v1/push-tokens/${encodeURIComponent(token)}`, z.void(), {
+    method: "DELETE",
+  });
+}
+
 export function validateMatch(
   matchId: number,
   body: ValidationCreate,

@@ -3,11 +3,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
-import { getMe, patchMe } from "../../lib/api/client";
+import { getMe, patchMe, registerPushToken, unregisterPushToken } from "../../lib/api/client";
+import {
+  getPushPref,
+  registerForPushNotificationsAsync,
+  setPushPref,
+} from "../../lib/push";
 import type { PlayerGender } from "../../lib/api/types";
 import { colors, radius, spacing } from "../../lib/theme";
 
@@ -68,6 +73,34 @@ export default function EditProfile() {
   });
 
   const [photoError, setPhotoError] = useState<string | null>(null);
+
+  // Push-notification preference (Settings toggle).
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [pushBusy, setPushBusy] = useState(false);
+  useEffect(() => {
+    getPushPref().then(setPushEnabled);
+  }, []);
+
+  async function togglePush(next: boolean) {
+    setPushBusy(true);
+    setPushEnabled(next); // optimistic
+    try {
+      await setPushPref(next);
+      const token = await registerForPushNotificationsAsync();
+      if (token) {
+        if (next) await registerPushToken(token, Platform.OS);
+        else await unregisterPushToken(token);
+      } else if (next) {
+        // Permission denied / simulator — reflect that it's not actually on.
+        setPushEnabled(false);
+        await setPushPref(false);
+      }
+    } catch {
+      /* best-effort */
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   async function pickPhoto() {
     if (!user) return;
@@ -214,6 +247,34 @@ export default function EditProfile() {
             </View>
           </Field>
         ) : null}
+
+        {/* Notifications */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            borderWidth: 1,
+            borderColor: colors.border,
+            borderRadius: radius.md,
+            backgroundColor: colors.surface,
+            paddingVertical: spacing.md,
+            paddingHorizontal: spacing.md,
+          }}
+        >
+          <View style={{ flex: 1, paddingRight: spacing.md }}>
+            <Text style={{ color: colors.text, fontWeight: "600" }}>Push notifications</Text>
+            <Text style={{ color: colors.textMuted, fontSize: 12 }}>
+              Get notified when a match needs your approval.
+            </Text>
+          </View>
+          <Switch
+            value={pushEnabled}
+            onValueChange={togglePush}
+            disabled={pushBusy}
+            trackColor={{ true: colors.primary }}
+          />
+        </View>
 
         {save.isError ? (
           <Text style={{ color: colors.danger }}>
