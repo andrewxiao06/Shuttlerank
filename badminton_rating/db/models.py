@@ -593,3 +593,30 @@ class CeilingHistory(Base):
     )
 
     player: Mapped[Player] = relationship(back_populates="ceiling_history")
+
+
+# ---------------------------------------------------------------------------
+# PushToken — a device's Expo push token, so we can notify a player's phone
+# when a match needs their approval. One player can have several (phone,
+# tablet, reinstalls), so it's a child table keyed by the token itself.
+# ---------------------------------------------------------------------------
+
+class PushToken(Base):
+    __tablename__ = "push_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    player_id: Mapped[int] = mapped_column(
+        ForeignKey("players.id", ondelete="CASCADE"),
+        nullable=False, index=True,
+    )
+    # The Expo push token (e.g. "ExponentPushToken[xxxx]"). Unique so the same
+    # device re-registering just updates its owner instead of duplicating.
+    token: Mapped[str] = mapped_column(String(256), unique=True, nullable=False)
+    platform: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)  # "ios" | "android"
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # Bumped each time the app re-registers, so we can prune stale devices later.
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )

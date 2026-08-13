@@ -23,6 +23,7 @@ from badminton_rating.api.routes import (
     v1_leaderboard,
     v1_matches,
     v1_players,
+    v1_push,
     webhooks,
 )
 
@@ -91,6 +92,7 @@ def create_app() -> FastAPI:
     app.include_router(v1_matches.router)
     app.include_router(v1_leaderboard.router)
     app.include_router(v1_players.router)
+    app.include_router(v1_push.router)
     app.include_router(tournaments.router)
     app.include_router(webhooks.router)
     app.include_router(admin.router)
