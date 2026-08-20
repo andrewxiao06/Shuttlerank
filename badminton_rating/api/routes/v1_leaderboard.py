@@ -20,6 +20,7 @@ from badminton_rating.db.models import (
     RatingCategory,
 )
 from badminton_rating.db.session import get_db
+from badminton_rating.services.cache import get_redis
 from badminton_rating.services.categories import effective_rating
 from badminton_rating.engine.glicko import (
     GLICKO_SCALE,
@@ -58,6 +59,15 @@ async def overall_leaderboard(
     session: AsyncSession = Depends(get_db),
 ) -> CategoryLeaderboardOut:
     cat = _parse_category(category)
+
+    r = get_redis() #cache read 
+    key = f"leaderboard:{cat.value}:{min_matches}:{limit}:{offset}"
+    cached = await r.get(key)
+    if cached:
+        return CategoryLeaderboardOut.model_validate_json(cached)
+
+    
+
     base = (
         select(PlayerCategoryRating, Player)
         .join(Player, PlayerCategoryRating.player_id == Player.id)
@@ -100,13 +110,18 @@ async def overall_leaderboard(
             age=player.age,
             location=player.location,
         ))
-    return CategoryLeaderboardOut(
+    result =  CategoryLeaderboardOut(
         category=cat,
         total=total,
         limit=limit,
         offset=offset,
         entries=entries,
     )
+    #existing unchanged
+    await r.set(key, result.model_dump_json(), ex=30)  # cache for 30 seconds
+    return result
+
+    
 
 
 # Players who haven't played yet forecast from the same defaults a fresh
@@ -162,3 +177,5 @@ async def overall_forecast(
         player_calibrating=p_rd > 150.0,
         opponent_calibrating=o_rd > 150.0,
     )
+
+
