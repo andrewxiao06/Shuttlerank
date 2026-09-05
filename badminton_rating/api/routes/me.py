@@ -20,6 +20,7 @@ from badminton_rating.api.models.v1 import (
     CategoryRatingOut,
     PlayerMeOut,
     PlayerMePatch,
+    PlayerPublicOut,
 )
 from fastapi import HTTPException, status
 
@@ -137,6 +138,23 @@ async def player_me_out(session: AsyncSession, player: Player) -> PlayerMeOut:
         created_at=player.created_at,
         ratings=await _category_ratings(session, player.id),
         is_admin=is_admin_user(player.clerk_user_id),
+    )
+
+
+async def player_public_out(session: AsyncSession, player: Player) -> PlayerPublicOut:
+    """Public-safe projection of a Player — no email, clerk_user_id, or
+    is_admin. Used anywhere a caller need not be authenticated (search,
+    public profile lookup)."""
+    return PlayerPublicOut(
+        id=player.id,
+        name=player.name,
+        display_name=player.display_name,
+        gender=player.gender,
+        avatar_url=player.avatar_url,
+        age=player.age,
+        location=player.location,
+        created_at=player.created_at,
+        ratings=await _category_ratings(session, player.id),
     )
 
 

@@ -22,9 +22,14 @@ from badminton_rating.api.auth import _resolve_clerk_user_id
 from badminton_rating.api.models.v1 import (
     CategoryMatchOut,
     PlayerMeOut,
+    PlayerPublicOut,
 )
 from badminton_rating.api.routes.admin import is_admin_user
-from badminton_rating.api.routes.me import _category_ratings, player_me_out
+from badminton_rating.api.routes.me import (
+    _category_ratings,
+    player_me_out,
+    player_public_out,
+)
 from badminton_rating.api.routes.v1_matches import _participant_out
 from badminton_rating.db.models import (
     Match,
@@ -122,15 +127,16 @@ async def bootstrap_current_player(
     return await player_me_out(session, existing)
 
 
-@router.get("", response_model=List[PlayerMeOut])
+@router.get("", response_model=List[PlayerPublicOut])
 async def search_players(
     session: AsyncSession = Depends(get_db),
     q: Optional[str] = Query(None, max_length=120),
     limit: int = Query(10, ge=1, le=50),
-) -> List[PlayerMeOut]:
+) -> List[PlayerPublicOut]:
     """
     Search players by partial name (case-insensitive). Anyone can play
-    anyone — no gender filtering.
+    anyone — no gender filtering. Unauthenticated, so the response uses
+    the public-safe DTO (no email/clerk_user_id).
     """
     stmt = select(Player)
     if q:
@@ -144,7 +150,7 @@ async def search_players(
     stmt = stmt.order_by(Player.name).limit(limit)
 
     players = (await session.execute(stmt)).scalars().all()
-    return [await player_me_out(session, p) for p in players]
+    return [await player_public_out(session, p) for p in players]
 
 
 @router.get("/{player_id}/matches", response_model=List[CategoryMatchOut])
@@ -190,12 +196,12 @@ async def list_player_matches(
     ]
 
 
-@router.get("/{player_id}", response_model=PlayerMeOut)
+@router.get("/{player_id}", response_model=PlayerPublicOut)
 async def get_v1_player(
     player_id: int,
     session: AsyncSession = Depends(get_db),
-) -> PlayerMeOut:
-    """Public profile lookup — same shape as /players/me, but for any id."""
+) -> PlayerPublicOut:
+    """Public profile lookup — unauthenticated, so no email/clerk_user_id."""
     player = (await session.execute(
         select(Player).where(Player.id == player_id)
     )).scalar_one_or_none()
@@ -205,4 +211,4 @@ async def get_v1_player(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"player {player_id} not found",
         )
-    return await player_me_out(session, player)
+    return await player_public_out(session, player)

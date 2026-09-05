@@ -61,6 +61,22 @@ class PlayerMeOut(BaseModel):
     is_admin: bool = False
 
 
+class PlayerPublicOut(BaseModel):
+    """Public-safe player shape — same as PlayerMeOut minus fields that
+    have no legitimate public use (email, clerk_user_id, is_admin). Used
+    for player search and public profile lookup, which any caller can hit
+    without auth."""
+    id: int
+    name: str
+    display_name: Optional[str]
+    gender: Optional[PlayerGender]
+    avatar_url: Optional[str] = None
+    age: Optional[int] = None
+    location: Optional[str] = None
+    created_at: datetime
+    ratings: List[CategoryRatingOut]
+
+
 class PlayerMePatch(BaseModel):
     display_name: Optional[str] = Field(None, max_length=120)
     gender: Optional[PlayerGender] = None
