@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { Avatar } from "./ui/Avatar";
 import { Card } from "./ui/Card";
@@ -225,6 +225,17 @@ function Body({
           <Ionicons name="log-out-outline" size={22} color={colors.danger} />
           <Text style={{ color: colors.danger, fontSize: 16, fontWeight: "700" }}>
             Sign out
+          </Text>
+        </Pressable>
+      ) : null}
+
+      {onSignOut ? (
+        <Pressable
+          onPress={() => Linking.openURL("https://shuttlerank.org/privacy")}
+          style={{ paddingVertical: spacing.md, alignItems: "center" }}
+        >
+          <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+            Privacy Policy
           </Text>
         </Pressable>
       ) : null}

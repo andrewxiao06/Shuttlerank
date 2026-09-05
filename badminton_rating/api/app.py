@@ -29,6 +29,10 @@ from badminton_rating.api.routes import (
 
 
 def create_app() -> FastAPI:
+    # Set BRS_DISABLE_DOCS=1 in prod so /docs, /redoc, /openapi.json (full
+    # schema of every route, including admin/webhook internals) aren't
+    # publicly browsable.
+    docs_disabled = os.environ.get("BRS_DISABLE_DOCS", "0") == "1"
     app = FastAPI(
         title="Badminton Rating System",
         description=(
@@ -36,6 +40,9 @@ def create_app() -> FastAPI:
             "Inspired by DUPR and UBR, with original score-differential weighting."
         ),
         version="0.1.0",
+        docs_url=None if docs_disabled else "/docs",
+        redoc_url=None if docs_disabled else "/redoc",
+        openapi_url=None if docs_disabled else "/openapi.json",
     )
 
     # CORS — the Next.js frontend runs on a different origin in dev and in
