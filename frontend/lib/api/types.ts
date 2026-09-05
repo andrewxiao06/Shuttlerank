@@ -134,10 +134,12 @@ export type CategoryRating = z.infer<typeof CategoryRatingSchema>;
 
 export const PlayerMeSchema = z.object({
   id: z.number().int(),
-  clerk_user_id: z.string().nullable(),
+  // Only present on /players/me — the public search/lookup endpoints omit
+  // these for privacy, so they must be optional here.
+  clerk_user_id: z.string().nullable().optional(),
   name: z.string(),
   display_name: z.string().nullable(),
-  email: z.string().nullable(),
+  email: z.string().nullable().optional(),
   gender: PlayerGenderSchema.nullable(),
   avatar_url: z.string().nullable().optional(),
   age: z.number().int().nullable().optional(),
