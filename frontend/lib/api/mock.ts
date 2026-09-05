@@ -139,7 +139,7 @@ export async function createMatch(body: CategoryMatchCreate): Promise<CategoryMa
     team_a_score: body.team_a_score,
     team_b_score: body.team_b_score,
     winner_team: winner,
-    submitted_by_user_id: store.me.clerk_user_id,
+    submitted_by_user_id: store.me.clerk_user_id ?? null,
     verified_at: null,
     expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
     tournament_id: null,
@@ -288,7 +288,7 @@ export async function createTournament(
     starts_at: body.starts_at,
     ends_at: body.ends_at ?? null,
     status: "draft",
-    organizer_user_id: store.me.clerk_user_id,
+    organizer_user_id: store.me.clerk_user_id ?? null,
     entries: [],
   };
   store.tournaments = [...store.tournaments, t];
