@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -308,6 +309,15 @@ export function MeSettingsView() {
 
       {/* Match history — recent + all, with rating changes per row */}
       <MatchHistory playerId={me.id} />
+
+      <footer className="mt-10 border-t border-border pt-4 text-center">
+        <Link
+          href="/privacy"
+          className="text-caption text-text-secondary underline hover:text-text-primary"
+        >
+          Privacy Policy
+        </Link>
+      </footer>
     </main>
   );
 }
