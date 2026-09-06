@@ -144,6 +144,12 @@ function SignedOutHero() {
           </button>
         </SignInButton>
       </div>
+      <Link
+        href="/privacy"
+        className="mt-4 text-caption text-text-secondary underline-offset-2 hover:underline"
+      >
+        Privacy Policy
+      </Link>
       <div className="mt-12 grid w-full grid-cols-1 gap-3 sm:grid-cols-3">
         <Link
           href="/leaderboard"
