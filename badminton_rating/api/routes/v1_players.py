@@ -158,7 +158,8 @@ async def list_player_matches(
     player_id: int,
     session: AsyncSession = Depends(get_db),
     category: Optional[RatingCategory] = Query(None),
-    limit: int = Query(50, ge=1, le=200),
+    # Default to the max so "Show all" on web/mobile really shows all matches.
+    limit: int = Query(200, ge=1, le=200),
 ) -> List[CategoryMatchOut]:
     """
     Matches involving a given player, returned in the v1 CategoryMatch

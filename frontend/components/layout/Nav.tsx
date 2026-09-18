@@ -10,10 +10,9 @@ import { cn } from "@/lib/utils";
 
 /*
  * Top nav (desktop). Mobile uses MobileTabBar; this component hides at
- * <md so the two never compete for vertical real estate.
+ * <lg so the two never compete for vertical real estate.
  */
 const LINKS = [
-  { href: "/", label: "Home" },
   { href: "/leaderboard", label: "Leaderboard" },
   { href: "/tournaments", label: "Tournaments" },
   { href: "/forecast", label: "Forecast" },
@@ -31,9 +30,9 @@ export function TopNav() {
   const inboxCount = pendingQ.data?.length ?? 0;
 
   return (
-    <header className="sticky top-0 z-30 hidden h-16 border-b border-border bg-background/95 backdrop-blur md:block">
-      <nav className="mx-auto flex h-full max-w-5xl items-center justify-between gap-6 px-6">
-        <Link href="/" className="flex items-center" aria-label="ShuttleRank home">
+    <header className="sticky top-0 z-30 hidden h-16 border-b border-border bg-background/95 backdrop-blur lg:block">
+      <nav className="mx-auto flex h-full max-w-6xl items-center justify-between gap-4 px-6">
+        <Link href="/" className="flex shrink-0 items-center" aria-label="ShuttleRank home">
           <Image
             src="/brand/wordmark-black.png"
             alt="ShuttleRank"
@@ -43,7 +42,7 @@ export function TopNav() {
             className="h-7 w-auto"
           />
         </Link>
-        <ul className="flex items-center gap-1">
+        <ul className="flex min-w-0 items-center gap-0.5">
           {LINKS.map((l) => {
             const active = pathname === l.href;
             const showBadge = l.href === "/inbox" && inboxCount > 0;
@@ -52,7 +51,7 @@ export function TopNav() {
                 <Link
                   href={l.href}
                   className={cn(
-                    "relative inline-flex h-10 items-center rounded-md px-3 text-body-md",
+                    "relative inline-flex h-10 items-center whitespace-nowrap rounded-md px-2.5 text-body-md",
                     active
                       ? "bg-surface-muted text-text-primary"
                       : "text-text-secondary hover:bg-surface-muted hover:text-text-primary",
@@ -69,10 +68,10 @@ export function TopNav() {
             );
           })}
         </ul>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2">
           <Link
             href="/matches/new"
-            className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-body-md text-on-primary hover:opacity-90"
+            className="inline-flex h-10 items-center whitespace-nowrap rounded-md bg-primary px-4 text-body-md text-on-primary hover:opacity-90"
           >
             Submit
           </Link>
@@ -80,7 +79,7 @@ export function TopNav() {
             <SignInButton mode="modal">
               <button
                 type="button"
-                className="inline-flex h-10 items-center rounded-md px-4 text-body-md text-text-primary hover:bg-surface-muted"
+                className="inline-flex h-10 items-center whitespace-nowrap rounded-md px-3 text-body-md text-text-primary hover:bg-surface-muted"
               >
                 Sign in
               </button>
@@ -88,7 +87,7 @@ export function TopNav() {
             <SignUpButton mode="modal">
               <button
                 type="button"
-                className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-body-md text-on-primary hover:opacity-90"
+                className="inline-flex h-10 items-center whitespace-nowrap rounded-md bg-primary px-4 text-body-md text-on-primary hover:opacity-90"
               >
                 Sign up
               </button>
