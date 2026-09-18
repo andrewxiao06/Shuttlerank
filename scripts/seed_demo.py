@@ -1,6 +1,7 @@
 """
-Seed a demo population: 100 fake players, each with exactly 10 verified singles
-matches against one another, so the leaderboard and match feed look alive.
+Seed a demo population: 100 fake players who each play singles AND doubles
+against one another, with varied activity (10 to 43 verified matches each), so
+the leaderboards and match feed look alive.
 
 Ratings are NOT hand-assigned. Every match goes through the same service path
 the app uses (submit_category_match -> verify_pending_match), so the Glicko-2
@@ -47,9 +48,22 @@ from badminton_rating.services.categories import (
 )
 
 DEMO_EMAIL_DOMAIN = "@demo.shuttlerank.invalid"
-MATCHES_PER_PLAYER = 10
-SPAN_DAYS = 63  # first round this long ago, last round yesterday
+SPAN_DAYS = 90  # first round this long ago, last round yesterday
 SEED = 20260918
+
+# Total matches per player (singles + doubles). Skewed the way real clubs are:
+# lots of casual regulars in the low teens, a long tail of heavy players.
+TOTAL_MATCHES = (
+    [10] * 8 + [11, 12, 12, 13, 14, 14, 15, 16, 17, 18, 18, 20, 22, 24, 26, 28, 31, 33, 36, 38, 43, 43]
+)
+
+# Profile photos live in frontend/public/demo-avatars (served by the web app so
+# mobile can load them too). Counts per kind match the files on disk.
+AVATAR_BASE = "https://shuttlerank.org/demo-avatars"
+AVATAR_KINDS = {
+    "cat": 12, "dog": 12, "cartoon": 20, "land": 15, "badminton": 8,
+    "people-m": 10, "people-w": 10,
+}
 
 M, W = PlayerGender.M, PlayerGender.W
 
@@ -124,23 +138,58 @@ def build_population(rng: random.Random) -> list[dict]:
     return people
 
 
-def plan_rounds(people: list[dict], rng: random.Random) -> list[list[tuple[int, int]]]:
-    """10 rounds; each round is a perfect matching, so everyone plays exactly
-    once per round -> exactly 10 matches each. Opponents are drawn from
-    similar skill (like real club play) and repeat pairings are avoided."""
-    n = len(people)
-    met: set[frozenset[int]] = set()
-    rounds = []
-    for _ in range(MATCHES_PER_PLAYER):
-        for _attempt in range(200):
-            order = sorted(range(n), key=lambda i: people[i]["skill"] + rng.gauss(0, 0.7))
-            pairs = [(order[i], order[i + 1]) for i in range(0, n, 2)]
-            if not any(frozenset(p) in met for p in pairs):
-                break
-        # After 200 tries a rare rematch is acceptable.
-        met.update(frozenset(p) for p in pairs)
-        rounds.append([(a, b) if rng.random() < 0.5 else (b, a) for a, b in pairs])
-    return rounds
+def split_totals(people: list[dict], rng: random.Random) -> None:
+    """Give each player a target singles + doubles match count."""
+    for p in people:
+        total = rng.choice(TOTAL_MATCHES)
+        singles = max(4, round(total * rng.uniform(0.3, 0.6)))
+        p["want"] = {1: singles, 2: total - singles}
+
+
+def plan_matches(
+    people: list[dict], size: int, rng: random.Random
+) -> list[tuple[int, list[list[int]]]]:
+    """Plan every match of one format (size 1 = singles, 2 = doubles).
+
+    Returns [(round_index, [team_a_idx, team_b_idx])]. Players are spread over
+    the whole timeline: each round a player is drawn in with probability
+    remaining/rounds_left, so heavy players show up often and casual ones now
+    and then. Within a round, players are grouped with similar skill (like
+    real club play). Leftover targets are topped up at the end so everyone
+    reaches at least their target."""
+    n, group = len(people), size * 2
+    remaining = [p["want"][size] for p in people]
+    n_rounds = max(remaining)
+    planned: list[tuple[int, list[list[int]]]] = []
+
+    def emit(rnd: int, idxs: list[int]) -> None:
+        if size == 1:
+            teams = [[idxs[0]], [idxs[1]]]
+        else:  # balanced-ish: strongest + weakest vs the middle two, or random
+            g = idxs if rng.random() < 0.5 else [idxs[0], idxs[2], idxs[1], idxs[3]]
+            teams = [[g[0], g[3]], [g[1], g[2]]]
+        planned.append((rnd, teams))
+
+    for rnd in range(n_rounds):
+        left = n_rounds - rnd
+        active = [i for i in range(n) if remaining[i] > 0 and rng.random() < min(1.0, remaining[i] / left)]
+        rng.shuffle(active)
+        active = active[: len(active) // group * group]
+        active.sort(key=lambda i: people[i]["skill"] + rng.gauss(0, 0.7))
+        for k in range(0, len(active), group):
+            chunk = active[k : k + group]
+            for i in chunk:
+                remaining[i] -= 1
+            emit(rnd, chunk)
+
+    # Top-up: anyone still short plays extra matches on the final round.
+    for i in range(n):
+        while remaining[i] > 0:
+            others = rng.sample([j for j in range(n) if j != i], group - 1)
+            chunk = sorted([i, *others], key=lambda j: people[j]["skill"])
+            remaining[i] -= 1
+            emit(n_rounds - 1, chunk)
+    return planned
 
 
 def sample_result(skill_a: float, skill_b: float, rng: random.Random) -> tuple[int, int]:
@@ -158,12 +207,41 @@ def sample_result(skill_a: float, skill_b: float, rng: random.Random) -> tuple[i
     return (winner, loser) if a_wins else (loser, winner)
 
 
-def match_dates(n_rounds: int, rng: random.Random, today: date) -> list[date]:
-    step = SPAN_DAYS / max(1, n_rounds - 1)
-    return [
-        min(today - timedelta(days=1), today - timedelta(days=round(SPAN_DAYS - i * step)) + timedelta(days=rng.randint(0, 2)))
-        for i in range(n_rounds)
+def round_date(rnd: int, n_rounds: int, rng: random.Random, today: date) -> date:
+    days_ago = round(SPAN_DAYS * (1 - rnd / max(1, n_rounds - 1)))
+    return min(today - timedelta(days=1), today - timedelta(days=max(0, days_ago - rng.randint(0, 1))))
+
+
+def assign_avatars(people: list[dict], rng: random.Random) -> None:
+    """Mix of cats/dogs, cartoons, landscapes, portraits and badminton shots;
+    ~13% keep the default monogram. Portraits are matched to the player's
+    gender; everything else is spread at random."""
+    order = list(range(len(people)))
+    rng.shuffle(order)
+    portraits = {
+        PlayerGender.M: [f"people-m-{i:02d}.jpg" for i in range(1, 11)],
+        PlayerGender.W: [f"people-w-{i:02d}.jpg" for i in range(1, 11)],
+    }
+    rest: list[str | None] = [
+        f"{kind}-{i:02d}.jpg"
+        for kind, count in AVATAR_KINDS.items() if not kind.startswith("people")
+        for i in range(1, count + 1)
     ]
+    for pool in portraits.values():
+        pool.reverse()  # pop() from the end, in order
+    unassigned = []
+    for idx in order:
+        pool = portraits[people[idx]["gender"]]
+        if pool:
+            people[idx]["avatar"] = pool.pop()
+        else:
+            unassigned.append(idx)
+    rest += [None] * (len(unassigned) - len(rest))
+    rng.shuffle(rest)
+    for idx, fname in zip(unassigned, rest):
+        people[idx]["avatar"] = fname
+    for p in people:
+        p["avatar_url"] = f"{AVATAR_BASE}/{p['avatar']}" if p["avatar"] else None
 
 
 async def purge(session) -> None:
@@ -193,6 +271,8 @@ async def seed(session, rng: random.Random) -> None:
         sys.exit("demo players already exist — run with --purge first")
 
     people = build_population(rng)
+    split_totals(people, rng)
+    assign_avatars(people, rng)
     players: list[Player] = []
     for p in people:
         player = Player(
@@ -200,13 +280,14 @@ async def seed(session, rng: random.Random) -> None:
             display_name=f"{p['first']} {p['last']}",
             email=f"{_slug(p['first'], p['last'])}{DEMO_EMAIL_DOMAIN}",
             gender=p["gender"], age=p["age"], location=p["location"],
+            avatar_url=p["avatar_url"],
         )
         session.add(player)
         players.append(player)
     await session.flush()
 
-    # Self-pick seed rows (what onboarding writes), so the first singles match
-    # seeds from the player's stated level exactly as it does for real users.
+    # Self-pick seed rows (what onboarding writes), so the first match in each
+    # format seeds from the player's stated level exactly as it does for real users.
     for player, p in zip(players, people):
         session.add(PlayerCategoryRating(
             player_id=player.id, category=RatingCategory.OVERALL,
@@ -214,46 +295,60 @@ async def seed(session, rng: random.Random) -> None:
         ))
     await session.flush()
 
-    rounds = plan_rounds(people, rng)
-    dates = match_dates(len(rounds), rng, date.today())
+    # Plan both formats, then replay everything in date order so ratings evolve
+    # exactly as they would have in real life (doubles cross-seeds off singles).
+    today = date.today()
+    events = []
+    for size in (1, 2):
+        planned = plan_matches(people, size, rng)
+        n_rounds = 1 + max(r for r, _ in planned)
+        for rnd, teams in planned:
+            events.append((round_date(rnd, n_rounds, rng, today), rnd, size, teams))
+    events.sort(key=lambda e: (e[0], e[1], e[2]))
+
     total = 0
-    for played_at, pairs in zip(dates, rounds):
-        for a, b in pairs:
-            score_a, score_b = sample_result(people[a]["skill"], people[b]["skill"], rng)
-            match = await submit_category_match(session, CategoryMatchSubmission(
-                played_at=played_at,
-                team_a_player_ids=[players[a].id],
-                team_b_player_ids=[players[b].id],
-                team_a_score=score_a, team_b_score=score_b,
-            ))
-            await verify_pending_match(session, match)
-            total += 1
+    for played_at, _, size, (team_a, team_b) in events:
+        avg = lambda team: sum(people[i]["skill"] for i in team) / len(team)
+        score_a, score_b = sample_result(avg(team_a), avg(team_b), rng)
+        match = await submit_category_match(session, CategoryMatchSubmission(
+            played_at=played_at,
+            team_a_player_ids=[players[i].id for i in team_a],
+            team_b_player_ids=[players[i].id for i in team_b],
+            team_a_score=score_a, team_b_score=score_b,
+        ))
+        await verify_pending_match(session, match)
+        total += 1
     await session.commit()
-    print(f"seeded {len(players)} players, {total} verified singles matches")
+    print(f"seeded {len(players)} players, {total} verified matches")
 
     await report(session, players, people)
 
 
 async def report(session, players, people) -> None:
+    pids = [p.id for p in players]
     rows = (await session.execute(
         select(PlayerCategoryRating).where(
-            PlayerCategoryRating.category == RatingCategory.SINGLES,
-            PlayerCategoryRating.player_id.in_([p.id for p in players]),
+            PlayerCategoryRating.category.in_([RatingCategory.SINGLES, RatingCategory.DOUBLES]),
+            PlayerCategoryRating.player_id.in_(pids),
         )
     )).scalars().all()
-    by_pid = {r.player_id: r for r in rows}
-    counts = sorted({r.match_count for r in rows})
-    print(f"singles rows: {len(rows)}; distinct match counts: {counts}")
+    by = {(r.player_id, r.category): r for r in rows}
+    totals = [
+        by[(pl.id, RatingCategory.SINGLES)].match_count + by[(pl.id, RatingCategory.DOUBLES)].match_count
+        for pl in players
+    ]
+    print(f"total matches per player: min {min(totals)}, median {statistics.median(totals)}, max {max(totals)}")
+    print(f"distinct totals: {sorted(set(totals))}")
+    print(f"avatars: {sum(1 for p in people if p['avatar'])} photos, {sum(1 for p in people if not p['avatar'])} monograms")
 
     skills = [p["skill"] for p in people]
-    finals = [to_display_rating(by_pid[pl.id].r) for pl in players]
-    corr = statistics.correlation(skills, finals)
-    print(f"correlation(true skill, computed rating) = {corr:.3f}")
-
-    ranked = sorted(zip(players, finals), key=lambda x: -x[1])
-    print("top 5:   ", ", ".join(f"{pl.name} {d:.2f}" for pl, d in ranked[:5]))
-    print("bottom 5:", ", ".join(f"{pl.name} {d:.2f}" for pl, d in ranked[-5:]))
-    print(f"rating range {min(finals):.2f} - {max(finals):.2f}, median {statistics.median(finals):.2f}")
+    for cat in (RatingCategory.SINGLES, RatingCategory.DOUBLES):
+        finals = [to_display_rating(by[(pl.id, cat)].r) for pl in players]
+        corr = statistics.correlation(skills, finals)
+        ranked = sorted(zip(players, finals), key=lambda x: -x[1])
+        print(f"[{cat.value}] correlation(true skill, rating) = {corr:.3f}; "
+              f"range {min(finals):.2f}-{max(finals):.2f}, median {statistics.median(finals):.2f}")
+        print("   top 3:", ", ".join(f"{pl.name} {d:.2f}" for pl, d in ranked[:3]))
 
 
 async def main() -> None:
@@ -269,8 +364,9 @@ async def main() -> None:
     rng = random.Random(SEED)
     if args.dry_run:
         people = build_population(rng)
-        rounds = plan_rounds(people, rng)
-        print(f"would create {len(people)} players and {sum(len(r) for r in rounds)} matches")
+        split_totals(people, rng)
+        n = sum(len(plan_matches(people, size, rng)) for size in (1, 2))
+        print(f"would create {len(people)} players and {n} matches")
         return
     if not args.yes:
         sys.exit("refusing to write without --yes")
