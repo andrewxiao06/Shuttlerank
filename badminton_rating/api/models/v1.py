@@ -75,6 +75,11 @@ class PlayerPublicOut(BaseModel):
     location: Optional[str] = None
     created_at: datetime
     ratings: List[CategoryRatingOut]
+    # Always null here. Shipped mobile builds (<= TestFlight #8) parse this
+    # shape with a schema that requires these keys to be *present*; emitting
+    # them as null keeps those builds working without leaking anything.
+    email: None = None
+    clerk_user_id: None = None
 
 
 class PlayerMePatch(BaseModel):
