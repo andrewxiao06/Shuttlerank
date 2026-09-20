@@ -49,6 +49,7 @@ services:
       - "443:443"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./media:/srv/media:ro
       - caddy_data:/data       # persisted TLS certs — DO NOT delete casually
       - caddy_config:/config
     environment:

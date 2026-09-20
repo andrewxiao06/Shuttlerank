@@ -14,7 +14,17 @@
 
 {$API_DOMAIN} dubr.mooo.com {
 	encode gzip
-	reverse_proxy api:8000
+
+	# Static files (profile photos) served straight from disk.
+	handle_path /media/* {
+		root * /srv/media
+		header Cache-Control "public, max-age=86400"
+		file_server
+	}
+
+	handle {
+		reverse_proxy api:8000
+	}
 
 	# Let Caddy answer ACME challenges + set sensible security headers.
 	header {

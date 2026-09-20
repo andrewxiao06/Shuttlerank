@@ -8,7 +8,6 @@ RUNNING.md
 ARCHITECTURE.md
 CLAUDE.md
 DEPLOY.md
-DESIGN.md
 MOBILE.md
 PLAN.md
 PUSH.md
@@ -51,5 +50,11 @@ Thumbs.db
 *.log
 
 .obsidian/
+# Private core package (separate private repo, cloned here)
+badminton_rating/engine/
+
+# Static media served by the API host (kept out of git)
+media/
+
 # Legacy scaffold script — embeds the full algorithm spec; keep local
 setup.sh

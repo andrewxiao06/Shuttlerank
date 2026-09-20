@@ -36,3 +36,7 @@ docker-compose*.yml
 # Frontend artifacts (when we add them)
 node_modules/
 .next/
+
+# Private core package is a nested git repo; media is served by Caddy, not baked in.
+**/.git
+media/
