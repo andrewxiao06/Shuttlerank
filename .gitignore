@@ -2,8 +2,19 @@
 .specstory/
 .claude/settings.local.json
 
-# Personal notes — keep local
+# Personal / internal docs — keep local, never publish.
+# (Design notes, algorithm spec, deploy runbooks, and AI-assistant context.)
 RUNNING.md
+ARCHITECTURE.md
+CLAUDE.md
+DEPLOY.md
+DESIGN.md
+MOBILE.md
+PLAN.md
+PUSH.md
+AGENTS.md
+**/CLAUDE.md
+**/AGENTS.md
 
 # Python
 venv/
@@ -40,3 +51,5 @@ Thumbs.db
 *.log
 
 .obsidian/
+# Legacy scaffold script — embeds the full algorithm spec; keep local
+setup.sh
