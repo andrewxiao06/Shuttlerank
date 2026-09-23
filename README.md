@@ -2,7 +2,7 @@
 
 A badminton rating system built for **New Jersey badminton club members** — find where you rank, track your matches, and climb the club ladder.
 
-Ratings are computed by a Glicko-2–based engine (uncertainty-aware, tuned for casual match volume) that also factors in how decisively a match was won, not just who won. The engine itself is closed-source — it's the project's core differentiator — everything else here is open.
+Ratings are computed by a closed-source rating engine, tuned for casual club play. The engine itself isn't in this repo — it's the project's core differentiator, and it's covered separately in interviews/demos.
 
 Support for badminton clubs across the United States is planned.
 
