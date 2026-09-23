@@ -1,0 +1,126 @@
+<svg viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" font-family="'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace">
+  <title id="title">ShuttleRank architecture</title>
+  <desc id="desc">Client apps talk to Caddy over HTTPS with a Clerk JWT; Caddy proxies to FastAPI, which verifies the JWT, calls the closed-source rating engine, writes to Postgres, and fires email and push through external services. Clerk syncs new users into the API via webhook.</desc>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#565d66"/>
+    </marker>
+    <marker id="arrow-dashed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b6248"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1000" height="640" fill="#0b0d10"/>
+
+  <!-- edges -->
+  <path d="M170,100 L170,150 Q170,160 180,160 L490,160" fill="none" stroke="#565d66" stroke-width="1.25" marker-end="url(#arrow)"/>
+  <path d="M830,100 L830,160 Q830,170 820,170 L680,170" fill="none" stroke="#565d66" stroke-width="1.25" marker-end="url(#arrow)"/>
+  <path d="M280,55 Q470,20 855,45" fill="none" stroke="#6b6248" stroke-width="1.25" stroke-dasharray="3 4" marker-end="url(#arrow-dashed)"/>
+  <path d="M900,100 L920,120" fill="none" stroke="#6b6248" stroke-width="1.25" stroke-dasharray="3 4" marker-end="url(#arrow-dashed)"/>
+  <path d="M500,220 L500,270" fill="none" stroke="#565d66" stroke-width="1.25" marker-end="url(#arrow)"/>
+  <path d="M680,300 L760,300" fill="none" stroke="#565d66" stroke-width="1.25" marker-end="url(#arrow)"/>
+  <path d="M440,390 L300,390 L300,430" fill="none" stroke="#565d66" stroke-width="1.25" marker-end="url(#arrow)"/>
+  <path d="M800,390 L800,460 Q800,470 790,470 L400,470" fill="none" stroke="#565d66" stroke-width="1.25" marker-end="url(#arrow)"/>
+  <path d="M540,390 L540,430" fill="none" stroke="#6b6248" stroke-width="1.25" stroke-dasharray="3 4" marker-end="url(#arrow-dashed)"/>
+  <path d="M620,390 L700,430" fill="none" stroke="#6b6248" stroke-width="1.25" stroke-dasharray="3 4" marker-end="url(#arrow-dashed)"/>
+  <path d="M900,155 Q900,230 700,270" fill="none" stroke="#6b6248" stroke-width="1.25" stroke-dasharray="3 4" marker-end="url(#arrow-dashed)"/>
+
+  <!-- edge labels -->
+  <g font-size="10" fill="#6b7280">
+    <rect x="184" y="130" width="118" height="16" fill="#0b0d10"/>
+    <text x="190" y="142">HTTPS + Clerk JWT</text>
+    <rect x="700" y="130" width="118" height="16" fill="#0b0d10"/>
+    <text x="706" y="142">HTTPS + Clerk JWT</text>
+    <rect x="420" y="140" width="150" height="16" fill="#0b0d10"/>
+    <text x="426" y="152">proxy_pass :443 → :8000</text>
+    <rect x="760" y="195" width="150" height="16" fill="#0b0d10"/>
+    <text x="766" y="207">webhook: user.created</text>
+    <rect x="600" y="405" width="70" height="16" fill="#0b0d10"/>
+    <text x="606" y="417">on submit</text>
+  </g>
+
+  <!-- Row 1: clients -->
+  <g>
+    <rect x="40" y="30" width="260" height="70" rx="6" fill="#16191d" stroke="#4a5158" stroke-width="1.25"/>
+    <text x="60" y="58" font-size="13.5" font-weight="600" fill="#e9ebee">Web app</text>
+    <text x="60" y="76" font-size="11" fill="#9aa1aa">Next.js 16 · React 19 · Vercel</text>
+    <text x="60" y="92" font-size="9.5" fill="#6b7280" letter-spacing="0.06em">shuttlerank.org</text>
+  </g>
+
+  <g>
+    <rect x="700" y="30" width="260" height="70" rx="6" fill="#16191d" stroke="#4a5158" stroke-width="1.25"/>
+    <text x="720" y="58" font-size="13.5" font-weight="600" fill="#e9ebee">Mobile app</text>
+    <text x="720" y="76" font-size="11" fill="#9aa1aa">Expo (React Native) · TestFlight</text>
+    <text x="720" y="92" font-size="9.5" fill="#6b7280" letter-spacing="0.06em">iOS beta</text>
+  </g>
+
+  <!-- Row 2: edge -->
+  <g>
+    <rect x="850" y="20" width="150" height="55" rx="6" fill="#1a1712" stroke="#5c4f38" stroke-width="1.25" stroke-dasharray="4 3"/>
+    <text x="866" y="42" font-size="13.5" font-weight="600" fill="#e3c48c">Clerk</text>
+    <text x="866" y="58" font-size="11" fill="#9aa1aa">auth (managed)</text>
+  </g>
+
+  <g>
+    <rect x="330" y="150" width="340" height="70" rx="6" fill="#16191d" stroke="#4a5158" stroke-width="1.25"/>
+    <text x="350" y="178" font-size="13.5" font-weight="600" fill="#e9ebee">Caddy</text>
+    <text x="350" y="196" font-size="11" fill="#9aa1aa">TLS termination + reverse proxy</text>
+    <text x="350" y="212" font-size="9.5" fill="#6b7280" letter-spacing="0.06em">api.shuttlerank.org · auto Let's Encrypt</text>
+  </g>
+
+  <!-- Row 3: app layer -->
+  <g>
+    <rect x="330" y="270" width="340" height="100" rx="6" fill="#16191d" stroke="#4a5158" stroke-width="1.25"/>
+    <text x="350" y="298" font-size="13.5" font-weight="600" fill="#e9ebee">FastAPI</text>
+    <text x="350" y="316" font-size="11" fill="#9aa1aa">async · SQLAlchemy 2.0 · asyncpg</text>
+    <text x="350" y="332" font-size="11" fill="#9aa1aa">verifies JWT · routes · match validation</text>
+    <text x="350" y="352" font-size="9.5" fill="#6b7280" letter-spacing="0.06em">Docker · EC2 · alembic upgrade on boot</text>
+  </g>
+
+  <g>
+    <rect x="760" y="270" width="200" height="100" rx="6" fill="#10181a" stroke="#3d5f59" stroke-width="1.25"/>
+    <text x="780" y="298" font-size="13.5" font-weight="600" fill="#6fd7c5">Rating engine</text>
+    <text x="780" y="316" font-size="11" fill="#9aa1aa">match ratings, forecasts,</text>
+    <text x="780" y="332" font-size="11" fill="#9aa1aa">tier calculation</text>
+    <text x="780" y="352" font-size="9.5" fill="#6b7280" letter-spacing="0.06em">private repo · closed source</text>
+  </g>
+
+  <!-- Row 4: data + external -->
+  <g>
+    <path d="M160,430 a110,12 0 0 1 220,0 v45 a110,12 0 0 1 -220,0 z" fill="#16191d" stroke="#4a5158" stroke-width="1.25"/>
+    <path d="M160,430 a110,12 0 0 0 220,0" fill="none" stroke="#4a5158" stroke-width="1.25"/>
+    <text x="200" y="452" font-size="13.5" font-weight="600" fill="#e9ebee">Postgres</text>
+    <text x="200" y="468" font-size="11" fill="#9aa1aa">Neon · players, matches, ratings</text>
+  </g>
+
+  <g>
+    <rect x="430" y="430" width="180" height="55" rx="6" fill="#1a1712" stroke="#5c4f38" stroke-width="1.25" stroke-dasharray="4 3"/>
+    <text x="446" y="452" font-size="13.5" font-weight="600" fill="#e3c48c">Resend</text>
+    <text x="446" y="468" font-size="11" fill="#9aa1aa">transactional email</text>
+  </g>
+
+  <g>
+    <rect x="650" y="430" width="210" height="55" rx="6" fill="#1a1712" stroke="#5c4f38" stroke-width="1.25" stroke-dasharray="4 3"/>
+    <text x="666" y="452" font-size="13.5" font-weight="600" fill="#e3c48c">Expo push relay</text>
+    <text x="666" y="468" font-size="11" fill="#9aa1aa">mobile notifications</text>
+  </g>
+
+  <!-- legend -->
+  <g font-size="11.5" fill="#9aa1aa">
+    <rect x="40" y="525" width="14" height="14" rx="3" fill="#16191d" stroke="#4a5158" stroke-width="1.25"/>
+    <text x="62" y="536">service you run / own code</text>
+
+    <rect x="270" y="525" width="14" height="14" rx="3" fill="#1a1712" stroke="#5c4f38" stroke-width="1.25" stroke-dasharray="3 2"/>
+    <text x="292" y="536">managed / external service</text>
+
+    <rect x="500" y="525" width="14" height="14" rx="3" fill="#10181a" stroke="#3d5f59" stroke-width="1.25"/>
+    <text x="522" y="536">closed-source module</text>
+
+    <line x1="40" y1="560" x2="62" y2="560" stroke="#565d66" stroke-width="1.25"/>
+    <text x="70" y="564">request path</text>
+
+    <line x1="200" y1="560" x2="222" y2="560" stroke="#6b6248" stroke-width="1.25" stroke-dasharray="3 4"/>
+    <text x="230" y="564">auth / async / external call</text>
+  </g>
+</svg>
